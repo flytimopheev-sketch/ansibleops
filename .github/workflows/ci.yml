@@ -33,7 +33,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcb-dev libgl1-mesa-dev libonig-dev
+          sudo apt-get install -y libx11-dev libxcb1-dev libgl1-mesa-dev libonig-dev
       - run: cargo clippy --all-targets -- -D warnings
 
   check:
@@ -46,7 +46,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcb-dev libgl1-mesa-dev libonig-dev
+          sudo apt-get install -y libx11-dev libxcb1-dev libgl1-mesa-dev libonig-dev
       - run: cargo check --all-targets
 
   test:
@@ -59,7 +59,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcb-dev libgl1-mesa-dev libonig-dev
+          sudo apt-get install -y libx11-dev libxcb1-dev libgl1-mesa-dev libonig-dev
       - run: cargo test --all
 
   build:
@@ -73,7 +73,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcb-dev libgl1-mesa-dev libonig-dev
+          sudo apt-get install -y libx11-dev libxcb1-dev libgl1-mesa-dev libonig-dev
       - run: cargo build --release
       - uses: actions/upload-artifact@v4
         with:
