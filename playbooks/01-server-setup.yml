@@ -1,0 +1,202 @@
+---
+- name: Базовая настройка серверов
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    admin_users:
+      - name: deploy
+        shell: /bin/bash
+        groups: wheel,sudo
+        ssh_key: "ssh-rsa AAAAB3... ваш_ключ ...admin@company"
+      - name: monitoring
+        shell: /bin/bash
+        groups: wheel
+        ssh_key: "ssh-rsa AAAAB3... ваш_ключ ...monitoring@company"
+
+    ssh_config:
+      port: 2222
+      permit_root_login: "no"
+      password_authentication: "no"
+      max_auth_tries: 3
+
+  tasks:
+    - name: Обновление всех пакетов
+      dnf:
+        name: "*"
+        state: latest
+        update_cache: yes
+      tags: [update]
+
+    - name: Установка базовых утилит
+      dnf:
+        name:
+          - vim
+          - wget
+          - curl
+          - htop
+          - tmux
+          - git
+          - unzip
+          - tar
+          - net-tools
+          - bind-utils
+          - lsof
+          - strace
+          - tcpdump
+          - mc
+          - rsync
+          - bash-completion
+        state: present
+      tags: [packages]
+
+    - name: Настройка NTP (синхронизация времени)
+      dnf:
+        name: chrony
+        state: present
+      tags: [ntp]
+
+    - name: Настройка chrony.conf
+      template:
+        src: chrony.conf.j2
+        dest: /etc/chrony.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: restart chrony
+      tags: [ntp]
+
+    - name: Создание административных пользователей
+      user:
+        name: "{{ item.name }}"
+        shell: "{{ item.shell }}"
+        groups: "{{ item.groups }}"
+        append: yes
+        create_home: yes
+        state: present
+      loop: "{{ admin_users }}"
+      tags: [users]
+
+    - name: Добавление SSH-ключей пользователям
+      authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ item.ssh_key }}"
+        state: present
+      loop: "{{ admin_users }}"
+      tags: [users, ssh]
+
+    - name: Настройка SSH — порт
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?Port "
+        line: "Port {{ ssh_config.port }}"
+      notify: restart sshd
+      tags: [ssh]
+
+    - name: Настройка SSH — запрет root
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PermitRootLogin "
+        line: "PermitRootLogin {{ ssh_config.permit_root_login }}"
+      notify: restart sshd
+      tags: [ssh]
+
+    - name: Настройка SSH — запрет паролей
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PasswordAuthentication "
+        line: "PasswordAuthentication {{ ssh_config.password_authentication }}"
+      notify: restart sshd
+      tags: [ssh]
+
+    - name: Настройка SSH — ограничение попыток входа
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?MaxAuthTries "
+        line: "MaxAuthTries {{ ssh_config.max_auth_tries }}"
+      notify: restart sshd
+      tags: [ssh]
+
+    - name: Настройка файрвола — открыть SSH порт
+      firewalld:
+        port: "{{ ssh_config.port }}/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      tags: [firewall]
+
+    - name: Настройка файрвола — открыть HTTP/HTTPS
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - http
+        - https
+      when: "'webservers' in group_names"
+      tags: [firewall]
+
+    - name: Настройка файрвола — открыть PostgreSQL
+      firewalld:
+        port: "5432/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      when: "'databases' in group_names"
+      tags: [firewall]
+
+    - name: Настройка sysctl — оптимизация сети
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_set: yes
+        state: present
+        reload: yes
+      loop:
+        - { key: "net.core.somaxconn", value: "65535" }
+        - { key: "net.ipv4.tcp_max_syn_backlog", value: "65535" }
+        - { key: "net.ipv4.ip_local_port_range", value: "1024 65535" }
+        - { key: "net.ipv4.tcp_tw_reuse", value: "1" }
+        - { key: "vm.swappiness", value: "10" }
+      tags: [sysctl]
+
+    - name: Настройка limits — увеличить открытые файлы
+      pam_limits:
+        domain: "*"
+        limit_type: "{{ item.type }}"
+        limit_item: nofile
+        value: "{{ item.value }}"
+      loop:
+        - { type: "soft", value: "65536" }
+        - { type: "hard", value: "131072" }
+      tags: [limits]
+
+    - name: Настройка hostname
+      hostname:
+        name: "{{ inventory_hostname }}.local"
+      tags: [hostname]
+
+    - name: Вывод информации о сервере
+      debug:
+        msg: |
+          Сервер: {{ inventory_hostname }}
+          ОС: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Ядро: {{ ansible_kernel }}
+          CPU: {{ ansible_processor_vcpus }} ядер
+          RAM: {{ (ansible_memtotal_mb / 1024) | round(1) }} GB
+          IP: {{ ansible_default_ipv4.address | default('N/A') }}
+      tags: [info]
+
+  handlers:
+    - name: restart chrony
+      service:
+        name: chronyd
+        state: restarted
+        enabled: yes
+
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted

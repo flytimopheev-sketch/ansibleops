@@ -1,0 +1,25 @@
+{
+  "name": "ansibleops",
+  "version": "1.2.0",
+  "description": "AnsibleOps — desktop control center for Ansible and Terraform",
+  "license": "MIT",
+  "homepage": "https://github.com/flytimopheev-sketch/ansibleops",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flytimopheev-sketch/ansibleops.git"
+  },
+  "bugs": {
+    "url": "https://github.com/flytimopheev-sketch/ansibleops/issues"
+  },
+  "keywords": [
+    "ansible",
+    "devops",
+    "automation",
+    "terraform",
+    "redos",
+    "rpm",
+    "gui"
+  ],
+  "author": "flytimopheev-sketch",
+  "private": false
+}

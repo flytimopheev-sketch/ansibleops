@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=AnsibleOps
+Name[ru]=AnsibleOps
+GenericName=Ansible Control Center
+Comment=Desktop control center for Ansible and Terraform
+Comment[ru]=Центр управления Ansible и Terraform
+Exec=ansibleops
+Icon=ansibleops
+Terminal=false
+Categories=Development;System;Utility;
+Keywords=ansible;devops;automation;terraform;inventory;
+StartupNotify=true
+StartupWMClass=ansibleops

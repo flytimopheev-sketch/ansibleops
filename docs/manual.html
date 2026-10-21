@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>AnsibleOps — Руководство администратора</title>
+<style>
+@page { size: A4; margin: 12mm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Arial; font-size: 11.5px; line-height: 1.55; color: #232130; margin: 0; }
+.cover { position: relative; height: 270mm; background: url('cover.png') center/cover no-repeat; border-radius: 14px; color: #fff; page-break-after: always; }
+.cover .inner { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18mm 14mm 16mm; background: linear-gradient(180deg, rgba(20,18,30,0) 30%, rgba(20,18,30,.88) 100%); border-radius: 14px; }
+.cover h1 { font-size: 40px; margin: 0 0 4px; letter-spacing: .5px; }
+.cover .sub { font-size: 15px; color: #cfc9ec; }
+.cover .meta { margin-top: 10px; font-size: 11px; color: #9a94b8; }
+h1 { color: #36255C; font-size: 21px; margin: 26px 0 10px; border-bottom: 3px solid #7aa2f7; padding-bottom: 6px; page-break-after: avoid; }
+h2 { color: #4a3a7a; font-size: 15px; margin: 18px 0 8px; page-break-after: avoid; }
+h3 { color: #5a4a8a; font-size: 12.5px; margin: 14px 0 6px; }
+section { page-break-before: always; }
+.toc { page-break-before: always; }
+.toc li { margin: 3px 0; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 10.5px; }
+th, td { border: 1px solid #cfc9e0; padding: 5px 7px; text-align: left; vertical-align: top; }
+th { background: #36255C; color: #fff; }
+tr:nth-child(even) td { background: #f3f0fa; }
+.note, .warn, .tip { border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 11px; }
+.note { background: #e8f0fe; border-left: 4px solid #7aa2f7; }
+.warn { background: #fdecef; border-left: 4px solid #f7768e; }
+.tip { background: #eaf6e3; border-left: 4px solid #9ece6a; }
+kbd { background: #23212C; color: #DEDCeb; border-radius: 5px; padding: 1px 7px; font-size: 10px; font-family: Consolas, monospace; }
+ol.steps li { margin: 4px 0; }
+code { background: #efeaf8; border-radius: 4px; padding: 1px 5px; font-family: Consolas, monospace; font-size: 10.5px; color: #36255C; }
+pre { background: #23212C; color: #c9c7d6; border-radius: 8px; padding: 10px 12px; font-size: 10px; overflow: hidden; }
+/* ==== СКРИНШОТЫ-СХЕМЫ ==== */
+.shot { margin: 10px 0 4px; page-break-inside: avoid; }
+.cap { font-size: 10px; color: #6b6880; text-align: center; margin: 4px 0 10px; font-style: italic; }
+.win { border-radius: 10px; overflow: hidden; border: 1px solid #b9b3d0; box-shadow: 0 3px 14px rgba(30,20,60,.25); font-size: 10px; }
+.tb { background: #0078d7; color: #fff; padding: 4px 10px; display: flex; justify-content: space-between; font-size: 10px; }
+.top { background: #23212C; color: #DEDCeb; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+.top .lg { background: rgba(122,162,247,.25); border: 1px solid #7aa2f7; border-radius: 6px; padding: 2px 6px; }
+.top .ver { color: #9694aa; font-size: 9px; }
+.sp { flex: 1; }
+.chip { background: #302E3C; border-radius: 10px; padding: 2px 8px; font-size: 9px; }
+.st { color: #9694aa; font-size: 9px; }
+.mid { display: flex; background: #23212C; min-height: 240px; }
+.rail { width: 46px; background: #1c1a25; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.ric { width: 34px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; }
+.ric.on { background: #403E50; }
+.cnt { flex: 1; padding: 10px 12px; color: #c9c7d6; }
+.sb { background: #1c1a25; color: #9694aa; padding: 4px 12px; display: flex; gap: 14px; font-size: 9px; }
+.h { color: #bb9af7; font-weight: 600; font-size: 11.5px; margin: 4px 0 6px; }
+.lbl { color: #9694aa; font-size: 9px; margin: 4px 0 2px; }
+.inp { background: #302E3C; border: 1px solid #403E50; border-radius: 6px; padding: 4px 8px; margin-bottom: 4px; color: #DEDCeb; }
+.btn { background: #302E3C; border: 1px solid #403E50; border-radius: 6px; padding: 3px 9px; display: inline-block; margin: 2px 3px 2px 0; color: #DEDCeb; }
+.btn.g { background: #9ece6a; border-color: #9ece6a; color: #16230c; font-weight: 600; }
+.btn.big { display: block; text-align: center; padding: 7px; border-radius: 8px; }
+.chk { color: #c9c7d6; margin: 3px 0; }
+.cols { display: flex; gap: 10px; }
+.side { width: 34%; border-right: 1px solid #302E3C; padding-right: 10px; }
+.main { flex: 1; }
+.bdg { border-radius: 6px; padding: 2px 8px; font-weight: 600; margin-right: 4px; }
+.bdg.g { background: rgba(158,206,106,.18); color: #9ece6a; }
+.bdg.b { background: rgba(122,162,247,.18); color: #7aa2f7; }
+.bdg.r { background: rgba(247,118,142,.18); color: #f7768e; }
+.bdg.m { background: rgba(150,148,170,.18); color: #9694aa; }
+.log { background: #16141d; border: 1px solid #302E3C; border-radius: 8px; padding: 8px; font-family: Consolas, monospace; font-size: 9.5px; color: #c9c7d6; min-height: 60px; }
+.card { background: #302E3C; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+.row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.g { background: #9ece6a; } .dot.r { background: #f7768e; } .dot.o { background: #ff9e64; }
+</style>
+</head>
+<body>
+
+<!-- ================= ОБЛОЖКА ================= -->
+<div class="cover"><div class="inner">
+  <h1>AnsibleOps</h1>
+  <div class="sub">Полное руководство администратора</div>
+  <div class="sub" style="font-size:12px">Версия 1.2.0 • Windows / РЕДОС</div>
+  <div class="meta">Редакция от 28.08.2026 • Автор: ваш e-mail • Распространяется вместе с продуктом</div>
+</div></div>
+
+<!-- ================= ОГЛАВЛЕНИЕ ================= -->
+<div class="toc">
+<h1 style="page-break-before:auto">Оглавление</h1>
+<ol>
+<li>Введение и архитектура</li>
+<li>Установка и первый запуск</li>
+<li>Обзор интерфейса: шапка, навигация, статус-бар</li>
+<li>Темы оформления и горячие клавиши</li>
+<li>Вкладка «Run» — запуск playbook</li>
+<li>Вкладка «Editor»</li>
+<li>Вкладка «Constructor»</li>
+<li>Вкладка «Admin»</li>
+<li>Вкладка «Ad-Hoc»</li>
+<li>Вкладка «Library»</li>
+<li>Вкладка «Roles» — каталог ролей</li>
+<li>Вкладка «Diff» — изменения и версии файлов</li>
+<li>Вкладка «Graph»</li>
+<li>Вкладка «Terraform»</li>
+<li>Вкладка «Tools» — инструменты</li>
+<li>Вкладка «Domain» — управление доменом</li>
+<li>Вкладка «Profiles» — профили рабочих станций</li>
+<li>Вкладка «Workflow» — сценарии</li>
+<li>Вкладка «OpsCenter» — центр операций</li>
+<li>Вкладка «Compliance» — Audit/Enforce</li>
+<li>Вкладка «History»</li>
+<li>Отчёты и Web API</li>
+<li>Упаковка и развёртывание на РЕДОС</li>
+<li>Устранение неполадок</li>
+<li>Приложения: горячие клавиши, глоссарий</li>
+</ol>
+</div>
+
+<!-- ================= 1 ================= -->
+<section>
+<h1>1. Введение и архитектура</h1>
+<p><b>AnsibleOps</b> — десктопный центр управления Ansible: запуск playbook, ad-hoc команды, визуальный конструктор, граф задач, админ-модули, домен, профили конфигураций, workflow-сценарии, центр операций с уровнями риска, compliance (Audit/Enforce), event-правила, diff и версии файлов, каталог ролей, планировщик, отчёты, локальный RPM-репозиторий, Git, Vault, Zabbix и Web API.</p>
+<h2>1.1 Архитектура</h2>
+<table>
+<tr><th>Слой</th><th>Технология</th><th>Назначение</th></tr>
+<tr><td>Фронтенд</td><td>Rust + egui/eframe 0.29</td><td>Вкладки, граф, редактор, темы</td></tr>
+<tr><td>Бэкенд</td><td>Rust + tokio</td><td>Асинхронный запуск ansible/terraform, стриминг вывода, история (JSON)</td></tr>
+<tr><td>Интеграции</td><td>Ansible Core, Terraform, Git, createrepo, Zabbix sender</td><td>Вызов системных CLI-команд через адаптеры</td></tr>
+</table>
+<div class="tip">Принцип адаптеров: GUI не зашивает команды жёстко — операции описаны в каталогах (модуль <code>ops.rs</code>), поэтому добавление новых действий не требует переписывания интерфейса.</div>
+</section>
+
+<!-- ================= 2 ================= -->
+<section>
+<h1>2. Установка и первый запуск</h1>
+<h2>2.1 Windows</h2>
+<ol class="steps">
+<li>Скопируйте <code>ansibleops.exe</code> в любую папку (например, <code>C:\ansibleops</code>).</li>
+<li>Установите Ansible (WSL) или укажите путь к прокси-скриптам <code>ansible.cmd</code>/<code>ansible-playbook.cmd</code> в PATH.</li>
+<li>Запустите <code>ansibleops.exe</code> двойным кликом.</li>
+</ol>
+<h2>2.2 РЕДОС (RPM)</h2>
+<pre>sudo dnf install ./ansibleops-studio-1.2.0-1.*.rpm
+ansibleops-studio</pre>
+<p>При отсутствии GUI-библиотек: <code>sudo dnf install libX11 libxcb mesa-libGL fontconfig</code>.</p>
+<h2>2.3 Первый запуск</h2>
+<ol class="steps">
+<li>Откройте приложение — появится главное окно (рис. 3.1).</li>
+<li>В статус-баре слева проверьте строку версии ansible. Если «ansible: not installed» — см. главу 24.</li>
+<li>Нажмите <span class="chip">🎨 Cosmic</span> в шапке, чтобы просмотреть 4 темы.</li>
+</ol>
+</section>
+
+<!-- ================= 3 ================= -->
+<section>
+<h1>3. Обзор интерфейса</h1>
+<div class="shot"><div class="win">
+<div class="tb"><span>⚡ AnsibleOps v1.2.0</span><span>— □ ✕</span></div>
+<div class="top"><span class="lg">⚡</span><b>AnsibleOps</b><span class="ver">v1.2.0</span><span class="sp"></span><span class="st">● Idle</span><span class="chip">RU</span><span class="chip">🎨 Cosmic</span><span class="chip">🔄</span><span class="chip">ℹ️ О программе</span></div>
+<div class="mid">
+<div class="rail"><span class="ric on">▶</span><span class="ric">📝</span><span class="ric">🏗</span><span class="ric">🛠</span><span class="ric">💻</span><span class="ric">📚</span><span class="ric">📦</span><span class="ric">🔍</span><span class="ric">🕸</span><span class="ric">🌍</span><span class="ric">🧰</span><span class="ric">🗂</span><span class="ric">🖥</span><span class="ric">🧾</span><span class="ric">🔀</span><span class="ric">⚡</span><span class="ric">🛡</span></div>
+<div class="cnt">
+<div class="cols"><div class="side">
+<div class="h">📂 Configuration</div>
+<div class="lbl">Inventory</div><div class="inp">inventory.ini</div>
+<div class="lbl">Playbook</div><div class="inp">site.yml</div>
+<div class="row"><span class="btn">📥 Load inv</span><span class="btn">📝 Load pb</span></div>
+<div class="h">🔐 SSH / Vault</div>
+<div class="chk">☐ Use become (sudo)</div>
+<div class="btn g big">▶ Run Playbook</div>
+</div><div class="main">
+<div class="h">📜 Execution Log</div>
+<div class="row"><span class="bdg g">OK 0</span><span class="bdg b">CHANGED 0</span><span class="bdg r">FAILED 0</span><span class="bdg m">SKIPPED 0</span></div>
+<div class="log">Press ▶ Run Playbook to start...</div>
+</div></div>
+</div></div>
+<div class="sb"><span><span class="dot g"></span> ansible-core 2.16</span><span>Hosts: 3</span><span>Jobs: 0</span><span>Ctrl+P — палитра</span><span class="sp"></span><span>AnsibleOps v1.2.0</span></div>
+</div><div class="cap">Рис. 3.1 — Главное окно (вкладка Run)</div></div>
+<h2>3.1 Шапка</h2>
+<table>
+<tr><th>Элемент</th><th>Действие</th></tr>
+<tr><td>⚡ + название</td><td>Логотип и версия</td></tr>
+<tr><td>● Idle / Running / Success / Failed</td><td>Текущее состояние последнего запуска</td></tr>
+<tr><td>RU / EN</td><td>Переключение языка интерфейса</td></tr>
+<tr><td>🎨 Cosmic</td><td>Циклическое переключение тем: Cosmic → Violet → Lavender → Vanilla</td></tr>
+<tr><td>🔄</td><td>Проверка обновления (нужен интернет)</td></tr>
+<tr><td>ℹ️ О программе</td><td>Окно со стеком технологий и контактом автора</td></tr>
+</table>
+<h2>3.2 Левая панель навигации</h2>
+<p>17 иконок-вкладок. Наведите курсор — появится подсказка с названием. Активная вкладка подсвечена.</p>
+<h2>3.3 Статус-бар</h2>
+<p>Слева: версия ansible, число загруженных хостов, число фоновых задач, подсказка <kbd>Ctrl+P</kbd>. Справа: название и версия.</p>
+<h2>3.4 Command Palette</h2>
+<ol class="steps">
+<li>Нажмите <kbd>Ctrl</kbd>+<kbd>P</kbd>.</li>
+<li>Введите часть команды, например «тема» или «Run».</li>
+<li>Кликните по строке — команда выполнится.</li>
+</ol>
+</section>
+
+<!-- ================= 4 ================= -->
+<section>
+<h1>4. Темы оформления и горячие клавиши</h1>
+<h2>4.1 Темы</h2>
+<ol class="steps">
+<li>Нажмите кнопку <span class="chip">🎨 Cosmic</span> в шапке.</li>
+<li>Каждое нажатие переключает тему: <b>Cosmic</b> (тёмная базовая), <b>Violet</b> (фиолетовая), <b>Lavender</b> (светлая лавандовая), <b>Vanilla</b> (светлая кремовая).</li>
+<li>Выбор сохраняется автоматически и восстановится после перезапуска.</li>
+</ol>
+<div class="note">Светлые темы полностью читаемы: все тексты, кнопки и панели берут цвета из активной палитры.</div>
+<h2>4.2 Горячие клавиши</h2>
+<table>
+<tr><th>Клавиши</th><th>Действие</th></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Запуск playbook (вкладка Run)</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Сохранить файл (вкладка Editor)</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Command Palette</td></tr>
+</table>
+</section>
+
+<!-- ================= 5 ================= -->
+<section>
+<h1>5. Вкладка «Run» — запуск playbook</h1>
+<ol class="steps">
+<li><b>Inventory</b>: введите путь или нажмите 📂 и выберите файл (<code>inventory.ini</code>).</li>
+<li><b>Playbook</b>: аналогично выберите <code>.yml</code>.</li>
+<li><b>Extra vars (-e)</b>: при необходимости строка переменных, например <code>env=prod</code>.</li>
+<li>Нажмите <b>📥 Load inv</b> — слева внизу появится список хостов с группами и адресами.</li>
+<li>Нажмите <b>📝 Load pb</b> — playbook будет разобран (нужно для вкладки Graph).</li>
+<li>Блок <b>SSH / Vault</b>: укажите приватный ключ (📂), включите <b>Use become</b> (sudo), при необходимости <b>Ask vault password</b>, задайте <b>forks</b> (параллельность).</li>
+<li>Нажмите зелёную кнопку <b>▶ Run Playbook</b> (или <kbd>Ctrl</kbd>+<kbd>R</kbd>).</li>
+<li>Следите за логом справа: строки <b>✓ [host]</b> — ok, <b>↻</b> — changed, <b>✗</b> — failed, <b>⊘</b> — skipped. Счётчики-бейджи обновляются на лету.</li>
+<li><b>Auto-scroll</b> — автопрокрутка; <b>🧹 Clear</b> — очистка лога.</li>
+</ol>
+<div class="tip">После завершения запись автоматически появляется во вкладке «History».</div>
+<div class="warn">Кнопка запуска блокируется («⏳ Running...»), пока идёт выполнение.</div>
+</section>
+
+<!-- ================= 6 ================= -->
+<section>
+<h1>6. Вкладка «Editor»</h1>
+<ol class="steps">
+<li>Файл попадает в редактор после «📝 Load pb», «📋 Копировать в Editor» (Library/Roles) или генерации из Constructor/Profiles.</li>
+<li>Редактируйте YAML в большом поле (моноширинный шрифт).</li>
+<li><b>💾 Save</b> или <kbd>Ctrl</kbd>+<kbd>S</kbd> — сохранение на диск.</li>
+</ol>
+<div class="note">Путь открытого файла отображается рядом с заголовком.</div>
+</section>
+
+<!-- ================= 7 ================= -->
+<section>
+<h1>7. Вкладка «Constructor»</h1>
+<div class="shot"><div class="win">
+<div class="tb"><span>⚡ AnsibleOps v1.2.0</span><span>— □ ✕</span></div>
+<div class="top"><span class="lg">⚡</span><b>AnsibleOps</b><span class="sp"></span><span class="chip">🎨 Cosmic</span></div>
+<div class="mid">
+<div class="rail"><span class="ric">▶</span><span class="ric">📝</span><span class="ric on">🏗</span><span class="ric">🛠</span></div>
+<div class="cnt">
+<div class="cols"><div class="side">
+<div class="h">🏗️ Конструктор Playbook</div>
+<div class="lbl">Name</div><div class="inp">My playbook</div>
+<div class="lbl">Hosts</div><div class="inp">all</div>
+<div class="chk">☑ Use become (sudo)</div>
+<div class="h">📦 Модули</div>
+<div class="card">▸ Пакеты (dnf, yum, apt)<br>▸ Службы (service)<br>▸ Файлы (copy, template)</div>
+</div><div class="main">
+<div class="h">📋 Задачи <span class="sp"></span> <span class="btn">👁 Предпросмотр YAML</span> <span class="btn">💾 Сохранить как playbook</span></div>
+<div class="card"><b>1. dnf</b> [Install nginx] <span class="sp"></span> <span class="btn">↑</span><span class="btn">↓</span><span class="btn">🗑</span><br>
+<span class="lbl">name:</span> <span class="inp" style="display:inline-block;width:120px">nginx</span> <span class="lbl">state:</span> <span class="inp" style="display:inline-block;width:90px">present</span><br>
+▸  Справка: dnf — DNF пакетный менеджер</div>
+<div class="card"><b>2. service</b> [Start nginx] …</div>
+</div></div>
+</div></div>
+<div class="sb"><span>Ctrl+P — палитра</span></div>
+</div><div class="cap">Рис. 7.1 — Конструктор</div></div>
+<ol class="steps">
+<li>Задайте <b>Name</b> и <b>Hosts</b> плейбука, флаги become/gather_facts.</li>
+<li>Слева раскройте категорию и нажмите модуль — задача добавится в список.</li>
+<li>Заполните параметры задачи; кнопки ↑/↓ меняют порядок, 🗑 удаляет.</li>
+<li>Раскройте «📖 Справка» — описание модуля и список параметров.</li>
+<li>Поля <b>when / register / notify</b> и флаги become/ignore_errors — для продвинутых сценариев.</li>
+<li><b>👁 Предпросмотр YAML</b> — посмотреть итог; <b>💾 Сохранить как playbook</b> — записать файл (диалог сохранения).</li>
+</ol>
+</section>
+
+<!-- ================= 8 ================= -->
+<section>
+<h1>8. Вкладка «Admin»</h1>
+<ol class="steps">
+<li><b>Целевые хосты</b>: группа или <code>all</code>.</li>
+<li><b>Модуль</b>: Package / Service / User / File — под полем появится подсказка с допустимыми действиями и примерами имён.</li>
+<li><b>Действие</b> (install, started, present…), <b>Имя</b> (nginx, sshd…), <b>Доп. аргументы</b>.</li>
+<li>Флаги: become (sudo), check mode (dry-run без изменений).</li>
+<li><b>▶ Выполнить задачу</b> — справа появится карточка задачи с прогресс-баром и выводом (раскройте «📋 Вывод»).</li>
+</ol>
+</section>
+
+<!-- ================= 9 ================= -->
+<section>
+<h1>9. Вкладка «Ad-Hoc»</h1>
+<ol class="steps">
+<li><b>Хосты</b>, <b>Модуль</b> (ping/shell/dnf/service…), <b>Аргументы</b>.</li>
+<li><b>▶ Выполнить</b> — команда вида <code>ansible all -m ping</code> появится в выводе ниже.</li>
+<li>«📚 Справочник модулей» — раскрывающиеся карточки с параметрами.</li>
+</ol>
+<div class="tip">Ad-Hoc — разовые операции без playbook: проверить связь, перезапустить сервис, поставить пакет.</div>
+</section>
+
+<!-- ================= 10 ================= -->
+<section>
+<h1>10. Вкладка «Library»</h1>
+<ol class="steps">
+<li>Выберите карточку готового решения.</li>
+<li><b>📋 Копировать в Editor</b> — YAML откроется в редакторе для правки.</li>
+<li><b>▶ Deploy</b> — быстрый запуск на хостах.</li>
+</ol>
+</section>
+
+<!-- ================= 11 ================= -->
+<section>
+<h1>11. Вкладка «Roles» — каталог ролей</h1>
+<div class="shot"><div class="win">
+<div class="tb"><span>⚡ AnsibleOps v1.2.0</span><span>— □ ✕</span></div>
+<div class="top"><span class="lg">⚡</span><b>AnsibleOps</b><span class="sp"></span><span class="chip">🎨 Cosmic</span></div>
+<div class="mid"><div class="rail"><span class="ric">▶</span><span class="ric on">📦</span></div>
+<div class="cnt">
+<div class="row"><span>Фильтр по тегу:</span><span class="inp" style="width:110px">security</span><span>Хосты:</span><span class="inp" style="width:90px">all</span></div>
+<div class="card"><b>hardening-ssh</b> <span style="color:#7dcfff">v1.4.0</span> <span style="color:#f7768e">[risk: высокий]</span><br>SSH hardening: запрет root, отключение password-auth<br><span style="color:#9694aa">Совместимость: Red OS 7, Red OS 8 • Теги: security, ssh</span><br><span style="color:#ff9e64">⚠ требует подтверждения</span> <span style="color:#9ece6a">↩ есть откат</span> <span class="sp"></span> <span class="btn">📋 В Editor</span><span class="btn">▶ Deploy</span></div>
+<div class="card"><b>ntp-setup</b> <span style="color:#7dcfff">v2.1.0</span> <span style="color:#9ece6a">[risk: низкий]</span> …</div>
+</div></div>
+<div class="sb"><span>Ctrl+P — палитра</span></div>
+</div><div class="cap">Рис. 11.1 — Каталог ролей</div></div>
+<ol class="steps">
+<li>Фильтр по тегу сужает список (security, docker, ntp…).</li>
+<li><b>▶ Deploy</b>: диалог сохранения YAML → файл пишется → запуск сразу.</li>
+<li><b>📋 В Editor</b> — для ручной правки перед запуском.</li>
+</ol>
+<div class="warn">Роли с пометкой «risk: высокий» сначала проверьте на тестовой группе (check mode / Diff).</div>
+</section>
+
+<!-- ================= 12 ================= -->
+<section>
+<h1>12. Вкладка «Diff» — изменения и версии файлов</h1>
+<ol class="steps">
+<li>Раскройте «▶ Запустить dry-run текущего playbook» → <b>🔍 Запустить diff-сканирование</b>. Выполнится <code>ansible-playbook --check --diff</code>; ниже появятся карточки: хост, файл, <span style="color:#9ece6a">+N</span>/<span style="color:#f7768e">−N</span> строк; раскройте «Diff» для просмотра «до/после».</li>
+<li>«📑 История версий»: введите <b>Хост</b> и <b>Файл</b> (например, <code>/etc/ssh/sshd_config</code>).</li>
+<li><b>⬇ Скачать и сохранить</b> — файл скачивается с хоста (модуль slurp) и сохраняется как версия с датой.</li>
+<li><b>🔄 Показать</b> — список сохранённых версий; раскройте «Содержимое» для просмотра.</li>
+</ol>
+<div class="tip">Рекомендуемый порядок работы с критичными конфигами: скачать версию → применить роль → при проблеме сравнить и восстановить вручную из сохранённой версии.</div>
+</section>
+
+<!-- ================= 13 ================= -->
+<section>
+<h1>13. Вкладка «Graph»</h1>
+<ol class="steps">
+<li>Предварительно нажмите «📝 Load pb» во вкладке Run.</li>
+<li>Узлы — задачи playbook; перетаскивайте их мышью для изменения порядка.</li>
+<li>При изменении появится «⚠️ Порядок изменён» → <b>💾 Сохранить в playbook</b> перезапишет файл в новом порядке.</li>
+</ol>
+</section>
+
+<!-- ================= 14 ================= -->
+<section>
+<h1>14. Вкладка «Terraform»</h1>
+<ol class="steps">
+<li>Укажите <b>Working directory</b> (папка с .tf-файлами) через 📂.</li>
+<li><b>Auto-approve</b> — без интерактивного подтверждения (для apply).</li>
+<li>Кнопки: <b>🔧 init</b> → <b>📋 plan</b> → <b>▶ apply</b>; <b>💣 destroy</b> — уничтожение инфраструктуры (осторожно!).</li>
+<li>Вывод streamed справа; ошибки подсвечены красным.</li>
+</ol>
+</section>
+
+<!-- ================= 15 ================= -->
+<section>
+<h1>15. Вкладка «Tools» — инструменты</h1>
+<h2>15.1 🩺 Диагностика</h2>
+<ol class="steps">
+<li>Задайте порт (по умолчанию 80) и нажмите <b>▶ Проверить все хосты</b>.</li>
+<li>Inventory загрузится автоматически; проверка идёт в фоне: ping, SSH:22, ваш порт.</li>
+<li>Результат: зелёные/красные индикаторы по каждому хосту.</li>
+</ol>
+<h2>15.2 🔐 Ansible Vault</h2>
+<ol class="steps">
+<li>📂 — выберите YAML с секретами; в соседнем поле — путь к файлу пароля (или пусто для запроса).</li>
+<li><b>🔒 Encrypt</b> — файл шифруется (начинается с <code>$ANSIBLE_VAULT;</code>); <b>🔓 Decrypt</b> — расшифровка.</li>
+</ol>
+<h2>15.3 📦 Локальный RPM-репозиторий</h2>
+<ol class="steps">
+<li>📂 — папка с <code>.rpm</code>; список пакетов появится сразу.</li>
+<li><b>🛠 createrepo</b> — создаёт <code>repodata</code>; после этого репо можно раздавать по сети (baseurl=http://…).</li>
+</ol>
+<h2>15.4 🔗 Git</h2>
+<p>📂 — папка плейбуков; <b>📊 status</b>, <b>📜 log</b>, комментарий + <b>💾 commit all</b> (add -A + commit).</p>
+<h2>15.5 🕐 Планировщик</h2>
+<p><b>➕ Добавить текущий playbook</b> → задайте интервал (мин). Пока приложение открыто, запуск выполняется автоматически.</p>
+<h2>15.6 🤖 Zabbix</h2>
+<p>Server/Port → <b>📡 Отправить тестовую метрику</b> (протокол sender). Ответ сервера выводится ниже.</p>
+<h2>15.7 📡 REST API</h2>
+<p><b>🌐 Запустить Web API (порт 8080)</b> → в браузере <code>http://localhost:8080</code> — статус, <code>/api/history</code> — JSON истории.</p>
+<h2>15.8 📄 Экспорт отчёта</h2>
+<p>Формат HTML/JSON/CSV → <b>📄 Экспортировать…</b> → диалог выбора места и имени файла.</p>
+<h2>15.9 📡 Event-правила (автореакция)</h2>
+<div class="shot"><div class="win">
+<div class="tb"><span>⚡ AnsibleOps v1.2.0</span><span>— □ ✕</span></div>
+<div class="mid"><div class="rail"><span class="ric on">🧰</span></div>
+<div class="cnt">
+<div class="h">📡 Event-правила (автореакция)</div>
+<div class="row"><span class="chk">☑</span><span class="inp" style="width:70px">disk</span><span class="inp" style="width:60px">90</span><span>действие:</span><span class="inp" style="width:160px">rm -rf /tmp/*</span><span class="btn">🗑</span></div>
+<div class="log">⚠️ [disk] Диск заполнен на 93% (порог 90%)<br>$ ansible all -m shell rm -rf /tmp/*</div>
+</div></div>
+</div><div class="cap">Рис. 15.1 — Event-правила</div></div>
+<ol class="steps">
+<li><b>➕ Правило</b>: тип (disk — порог %, service — имя службы, host — доступность), параметр, действие (команда исправления, можно пусто).</li>
+<li>Каждые 60 секунд правила проверяются; при нарушении — тост, запись в журнал и выполнение действия.</li>
+</ol>
+</section>
+
+<!-- ================= 16 ================= -->
+<section>
+<h1>16. Вкладка «Domain»</h1>
+<ol class="steps">
+<li><b>Хосты-контроллеры домена</b>: хост с FreeIPA/Samba/realm.</li>
+<li>Выберите <b>Операцию</b> из списка (просмотр пользователей/групп/машин, создать пользователя, массовое отключение/включение учёток, сброс пароля, снятие блокировки, ввод/вывод из домена, lastlog, группы компьютерам, действия OU).</li>
+<li>Заполните <b>Имя</b> и <b>Доп.</b> (для массовых операций имена через пробел).</li>
+<li><b>▶ Выполнить</b> — вывод в журнале внизу.</li>
+</ol>
+<div class="note">Операции описаны адаптерами (ipa/wbinfo/realm/net) — на standalone-хостах часть команд вернёт «не в домене», это нормально.</div>
+</section>
+
+<!-- ================= 17 ================= -->
+<section>
+<h1>17. Вкладка «Profiles»</h1>
+<ol class="steps">
+<li>Выберите профиль: Базовая РС, Сервер приложений, Файловый сервер, АРМ администратора, Безопасный, Разработчика, Терминальный.</li>
+<li>Просмотрите состав: пакеты, службы, hardening.</li>
+<li><b>📋 В Editor</b> — правка YAML; <b>💾 Сохранить YAML</b>; <b>▶ Deploy (push)</b> — немедленное применение на хостах из вкладки Run.</li>
+</ol>
+</section>
+
+<!-- ================= 18 ================= -->
+<section>
+<h1>18. Вкладка «Workflow»</h1>
+<div class="shot"><div class="win">
+<div class="tb"><span>⚡ AnsibleOps v1.2.0</span><span>— □ ✕</span></div>
+<div class="mid"><div class="rail"><span class="ric on">🔀</span></div>
+<div class="cnt">
+<div class="row"><span>Хосты:</span><span class="inp" style="width:90px">all</span><span class="btn">➕ Шаг</span><span class="btn">🧩 Пример сценария</span><span class="btn g">▶ Запустить workflow</span></div>
+<div class="card">1. [Проверить доступность] повторы:1 ☑ стоп при ошибке</div>
+<div class="card">2. [Резервная копия /etc] повторы:1 ☑ стоп при ошибке</div>
+<div class="card">3. [Обновить пакеты] повторы:2 ☑ стоп ☑ подтверждение</div>
+<div class="log">── шаг 1: Проверить доступность<br>web1 | SUCCESS<br>✅ Workflow завершён</div>
+</div></div>
+</div><div class="cap">Рис. 18.1 — Workflow</div></div>
+<ol class="steps">
+<li><b>🧩 Пример сценария</b> — готовая цепочка: ping → backup → update → restart → check → report.</li>
+<li>Для шага: тип, параметр (имя службы), <b>повторы</b>, <b>стоп при ошибке</b>, <b>подтверждение</b>.</li>
+<li><b>▶ Запустить workflow</b>; шаги с подтверждением откроют окно «⚠️ Подтверждение шагов».</li>
+<li>Журнал показывает каждый шаг и повторы; при критической ошибке — «⛔ Остановка».</li>
+</ol>
+</section>
+
+<!-- ================= 19 ================= -->
+<section>
+<h1>19. Вкладка «OpsCenter» — центр операций</h1>
+<ol class="steps">
+<li>Задайте <b>Хосты</b> и <b>Параметр</b> (имя службы/пользователя/команда для операций с {p}).</li>
+<li>Нажмите ▶ у операции. Уровни риска: 🟢 безопасная — выполняется сразу; 🟡 — окно подтверждения; 🔴 опасная — окно с обязательной <b>причиной</b>.</li>
+<li>Вывод — в «📜 Консоль» внизу.</li>
+</ol>
+<div class="warn">«Перезагрузка хоста» и «Произвольная команда» — уровень 🔴. Используйте только после dry-run и согласования.</div>
+</section>
+
+<!-- ================= 20 ================= -->
+<section>
+<h1>20. Вкладка «Compliance» — Audit/Enforce</h1>
+<ol class="steps">
+<li><b>Хосты</b>; <b>➕ Проверка</b>: тип (service / package / port / file) + имя.</li>
+<li><b>▶ Запустить</b> — режим Audit: таблица «ожидалось / факт», ✓ или ✗.</li>
+<li>Включите <b>Enforce (автоисправление)</b> — отклонения исправляются автоматически (статус «исправлено»): служба поднимется, пакет установится, порт откроется в firewall.</li>
+</ol>
+<div class="tip">Лучшая практика: сначала прогон в Audit, анализ отклонений, затем Enforce.</div>
+</section>
+
+<!-- ================= 21 ================= -->
+<section>
+<h1>21. Вкладка «History»</h1>
+<p>Список всех запусков: статус-иконка, playbook, время начала/окончания, бейджи ok/chg/fail. <b>🔄 Refresh</b> — обновить; 🗑 у записи — удалить; <b>🗑️ Очистить всё</b> — полная очистка.</p>
+</section>
+
+<!-- ================= 22 ================= -->
+<section>
+<h1>22. Отчёты и Web API</h1>
+<h2>22.1 Экспорт отчёта последнего запуска</h2>
+<ol class="steps">
+<li>Tools → «📄 Экспорт отчёта» → формат: <b>HTML</b> (красивая таблица для браузера), <b>JSON</b> (машины/интеграции), <b>CSV</b> (Excel/LibreOffice).</li>
+<li><b>📄 Экспортировать…</b> → выберите папку и имя → тост «📄 Сохранено: …».</li>
+</ol>
+<h2>22.2 Web API</h2>
+<p>Tools → «📡 REST API» → <b>🌐 Запустить</b>. Эндпоинты: <code>/</code> — статусная страница; <code>/api/history</code> — JSON. Используйте для мониторинга с другого устройства.</p>
+</section>
+
+<!-- ================= 23 ================= -->
+<section>
+<h1>23. Упаковка и развёртывание на РЕДОС</h1>
+<ol class="steps">
+<li>В WSL: <code>./packaging/build_redos.sh</code> — статическая сборка (musl) + RPM.</li>
+<li>Готовый RPM: <code>packaging/rpmbuild/RPMS/x86_64/ansibleops-studio-1.2.0-1.*.rpm</code>.</li>
+<li>Установка: <code>sudo dnf install ./ansibleops-studio-*.rpm</code>; запуск <code>ansibleops-studio</code> или из меню.</li>
+<li>Массовая раскатка: положите RPM в папку → Tools → 📦 → <b>createrepo</b> → раздайте по сети → на хостах playbook добавляет репо и ставит пакет (см. пример в главе 15.3).</li>
+</ol>
+</section>
+
+<!-- ================= 24 ================= -->
+<section>
+<h1>24. Устранение неполадок</h1>
+<table>
+<tr><th>Симптом</th><th>Решение</th></tr>
+<tr><td>«ansible: not installed» в статус-баре</td><td>Установите ansible или добавьте прокси-скрипты ansible.cmd в PATH</td></tr>
+<tr><td>Иконки — квадратики</td><td>Windows: проверьте наличие C:\Windows\Fonts\seguiemj.ttf; РЕДОС: sudo dnf install google-noto-emoji-color-fonts</td></tr>
+<tr><td>Окно «разъехалось» после обновления</td><td>Удалите кэш eframe: папки egui/eframe в %APPDATA%/%LOCALAPPDATA%</td></tr>
+<tr><td>Диагностика: «Нет хостов»</td><td>Нажмите «📥 Load inv» или укажите верный путь к inventory</td></tr>
+<tr><td>Порт 8080 занят</td><td>Освободите порт или завершите предыдущий экземпляр Web API</td></tr>
+<tr><td>Кнопки не реагируют при запуске</td><td>Идёт выполнение (Running) — дождитесь окончания или смотрите лог</td></tr>
+</table>
+</section>
+
+<!-- ================= 25 ================= -->
+<section>
+<h1>25. Приложения</h1>
+<h2>Приложение А. Сводка горячих клавиш</h2>
+<table><tr><th>Клавиши</th><th>Действие</th></tr>
+<tr><td>Ctrl+R</td><td>Запуск playbook</td></tr>
+<tr><td>Ctrl+S</td><td>Сохранить в Editor</td></tr>
+<tr><td>Ctrl+P</td><td>Command Palette</td></tr></table>
+<h2>Приложение Б. Глоссарий</h2>
+<table><tr><th>Термин</th><th>Значение</th></tr>
+<tr><td>Playbook</td><td>YAML-сценарий автоматизации Ansible</td></tr>
+<tr><td>Inventory</td><td>Файл со списком хостов и групп</td></tr>
+<tr><td>Ad-Hoc</td><td>Разовая команда без playbook</td></tr>
+<tr><td>Become</td><td>Выполнение с повышенными правами (sudo)</td></tr>
+<tr><td>Check mode / Diff</td><td>«Сухой» прогон с показом предполагаемых изменений</td></tr>
+<tr><td>Enforce</td><td>Режим автоматического исправления отклонений</td></tr>
+<tr><td>Vault</td><td>Шифрование секретов Ansible</td></tr></table>
+<p style="text-align:center;color:#6b6880;margin-top:20px">— Конец руководства —</p>
+</section>
+
+</body>
+</html>

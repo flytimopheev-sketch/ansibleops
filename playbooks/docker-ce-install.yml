@@ -1,0 +1,9 @@
+---
+- name: Docker CE Install Role
+  hosts: 
+  become: yes
+  tasks:
+    - name: Установить docker
+      dnf: { name: [docker-ce, docker-ce-cli, containerd.io], state: present }
+    - name: Запустить docker
+      service: { name: docker, state: started, enabled: yes }

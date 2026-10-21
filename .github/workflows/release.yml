@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 1.2.0)"
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rpm:
+    name: Build RPM (Red OS 7 / EL7)
+    runs-on: ubuntu-latest
+    container:
+      image: alrdockerhub/redos:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          set -x
+          # git нужен для actions/checkout, tar/gzip — для сборки тарбола,
+          # rpm-build — для rpmbuild.
+          dnf -y install git tar gzip which findutils rpm-build || true
+          dnf -y install libX11-devel libxcb-devel mesa-libGL-devel oniguruma-devel || true
+          for t in git tar gzip rpmbuild; do
+            command -v "$t" >/dev/null 2>&1 || { echo "ERROR: $t not available" >&2; exit 1; }
+          done
+          # Rust toolchain: in the base image cargo/rustc are present,
+          # otherwise try to install them from the distro repos.
+          if ! command -v cargo >/dev/null 2>&1; then
+            dnf -y install cargo rust || dnf -y install rust-toolset || true
+          fi
+          if ! command -v cargo >/dev/null 2>&1; then
+            echo "ERROR: cargo not available in the image" >&2
+            exit 1
+          fi
+          rpm --version
+          cargo --version
+          rustc --version
+
+      - name: Build RPM
+        run: bash packaging/build-rpm.sh "$PWD" /root/rpmbuild
+
+      - name: Verify RPM
+        run: |
+          set -e
+          RPM_FILE="$(ls dist/ansibleops-*.rpm | head -n1)"
+          echo "== rpm -K =="
+          rpm -K "$RPM_FILE"
+          echo "== rpm -qpl =="
+          rpm -qpl "$RPM_FILE"
+          echo "== rpm -qp --requires =="
+          rpm -qp --requires "$RPM_FILE"
+          echo "== rpm -qp --qf =="
+          rpm -qp --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' "$RPM_FILE"
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansibleops-rpm-el7
+          path: |
+            dist/*.rpm
+            dist/SHA256SUMS
+
+  release:
+    name: Publish GitHub Release
+    needs: rpm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ansibleops-rpm-el7
+          path: dist
+
+      - name: Determine version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create VERSION asset
+        run: |
+          echo "${{ steps.ver.outputs.version }}" > dist/VERSION
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AnsibleOps ${{ steps.ver.outputs.version }}
+          tag_name: v${{ steps.ver.outputs.version }}
+          body: |
+            ## AnsibleOps ${{ steps.ver.outputs.version }}
+
+            Desktop control center for Ansible and Terraform.
+
+            ### Установка (РЕДОС 7 / EL7)
+
+            ```bash
+            sudo dnf install ./ansibleops-*.rpm
+            ansibleops
+            ```
+
+            Проверка контрольной суммы:
+            ```bash
+            sha256sum -c SHA256SUMS
+            ```
+          files: |
+            dist/*.rpm
+            dist/VERSION
+            dist/SHA256SUMS
+          generate_release_notes: true

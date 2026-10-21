@@ -1,0 +1,146 @@
+- name: Настройка мониторинга серверов
+  hosts: all
+  become: yes
+  gather_facts: yes
+  vars:
+    monitoring:
+      disk_warning: 80
+      disk_critical: 95
+      cpu_warning: 85
+      memory_warning: 90
+      log_retention_days: 30
+  tasks:
+  - name: Установка инструментов мониторинга
+    dnf:
+      name:
+      - htop
+      - iotop
+      - iftop
+      - nload
+      - dstat
+      - sysstat
+      - lm_sensors
+      - smartmontools
+      state: present
+    tags:
+    - install
+  - name: Настройка ротации логов
+    copy:
+      dest: /etc/logrotate.d/custom-logs
+      content: |
+        /var/log/*.log {
+            daily
+            rotate {{ monitoring.log_retention_days }}
+            compress
+            delaycompress
+            missingok
+            notifempty
+            create 0640 root adm
+            sharedscripts
+            postrotate
+                /bin/systemctl reload rsyslog.service >/dev/null 2>&1 || true
+            endscript
+        }
+    tags:
+    - logs
+  - name: Настройка sar — ежедневный отчёт
+    cron:
+      name: sar daily report
+      minute: '0'
+      hour: '0'
+      job: /usr/lib64/sa/sa2 -A
+      user: root
+    tags:
+    - sar
+  - name: Настройка journald — хранение на диске
+    lineinfile:
+      path: /etc/systemd/journald.conf
+      regexp: ^#?Storage=
+      line: Storage=persistent
+    notify: restart journald
+    tags:
+    - logs
+  - name: Создание скрипта проверки сервисов
+    copy:
+      dest: /usr/local/bin/check-services.sh
+      mode: '0755'
+      content: |
+        #!/bin/bash
+        # Скрипт проверки критичных сервисов
+        SERVICES="sshd chronyd firewalld"
+
+        for svc in $SERVICES; do
+          if ! systemctl is-active --quiet "$svc"; then
+            echo "🔴 КРИТИЧНО: сервис $svc не запущен!"
+            systemctl restart "$svc"
+            echo "$(date): сервис $svc перезапущен автоматически" >> /var/log/service-check.log
+          fi
+        done
+    tags:
+    - scripts
+  - name: Создание скрипта проверки диска
+    copy:
+      dest: /usr/local/bin/check-disk.sh
+      mode: '0755'
+      content: |
+        #!/bin/bash
+        # Скрипт проверки дискового пространства
+        THRESHOLD={{ monitoring.disk_warning }}
+
+        df -h | awk 'NR>1 {print $5 " " $6}' | while read usage partition; do
+          usage_num=${usage%\%}
+          if [ "$usage_num" -ge "$THRESHOLD" ]; then
+            echo "⚠️  ВНИМАНИЕ: $partition заполнен на $usage"
+            # Здесь можно добавить отправку email/telegram
+            # curl -s "https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID>&text=Disk $partition $usage"
+          fi
+        done
+    tags:
+    - scripts
+  - name: Добавление cron для проверки сервисов (каждые 5 минут)
+    cron:
+      name: service health check
+      minute: '*/5'
+      job: /usr/local/bin/check-services.sh
+      user: root
+    tags:
+    - scripts
+  - name: Настройка sar (сбор статистики каждые 5 минут)
+    cron:
+      name: sar data collection
+      minute: '*/5'
+      job: /usr/lib64/sa/sa1 1 1
+      user: root
+    tags:
+    - sar
+  - name: Сбор информации о системе
+    debug:
+      msg: |
+        === {{ inventory_hostname }} ===
+        Загрузка CPU: {{ ansible_processor_vcpus }} ядер
+        Память: {{ ansible_memtotal_mb }} MB
+        Диск: {{ ansible_mounts | map(attribute='mount') | list | join(', ') }}
+        Uptime: {{ ansible_uptime_seconds | int // 86400 }} дней
+    tags:
+    - info
+  - name: Настройка journald — ограничение размера логов
+    lineinfile:
+      path: /etc/systemd/journald.conf
+      regexp: ^#?SystemMaxUse=
+      line: SystemMaxUse=500M
+    notify: restart journald
+    tags:
+    - logs
+  - name: Добавление cron для проверки диска (каждые 15 минут)
+    cron:
+      name: disk space check
+      minute: '*/15'
+      job: /usr/local/bin/check-disk.sh >> /var/log/disk-check.log 2>&1
+      user: root
+    tags:
+    - scripts
+  handlers:
+  - name: restart journald
+    service:
+      name: systemd-journald
+      state: restarted

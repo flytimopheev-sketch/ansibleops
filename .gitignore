@@ -1,0 +1,9 @@
+/target
+/dist
+*.rpm
+*.tar.gz
+SHA256SUMS
+.cargo-home/
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,14 @@
+[Unit]
+Name=AnsibleOps
+Description=AnsibleOps — desktop control center for Ansible and Terraform
+Documentation=https://github.com/flytimopheev-sketch/ansibleops
+After=network.target graphical.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ansibleops
+Restart=on-failure
+Environment=DISPLAY=:0
+
+[Install]
+WantedBy=graphical.target

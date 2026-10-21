@@ -1,0 +1,30 @@
+name: 03-webserver.yml
+path: playbooks/03-webserver.yml
+tasks:
+- name: Вывод результата проверки
+  module: debug
+  depends_on: []
+- name: Открытие портов в файрволе
+  module: firewalld
+  depends_on: []
+- name: Запуск и включение Nginx
+  module: service
+  depends_on: []
+- name: Проверка конфигурации Nginx
+  module: command
+  depends_on: []
+- name: Установка Nginx
+  module: dnf
+  depends_on: []
+- name: Настройка виртуальных хостов
+  module: copy
+  depends_on: []
+- name: Создание директорий для сайтов
+  module: file
+  depends_on: []
+- name: Настройка nginx.conf
+  module: copy
+  depends_on: []
+- name: Создание index.html для каждого сайта
+  module: copy
+  depends_on: []

@@ -1,0 +1,16 @@
+---
+- name: Test playbook
+  hosts: webservers
+  tasks:
+    - name: Ping hosts
+      ping:
+
+    - name: Uninstall nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Start service
+      service:
+        name: nginx
+        state: started

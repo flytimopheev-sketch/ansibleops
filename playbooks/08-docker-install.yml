@@ -1,0 +1,30 @@
+name: 08-docker-install.yml
+path: playbooks/08-docker-install.yml
+tasks:
+- name: Установить зависимости
+  module: dnf
+  depends_on: []
+- name: Версия Docker
+  module: debug
+  depends_on: []
+- name: Настроить Docker daemon
+  module: copy
+  depends_on: []
+- name: Проверить версию Docker
+  module: command
+  depends_on: []
+- name: Установить Docker
+  module: dnf
+  depends_on: []
+- name: Запустить и включить Docker
+  module: service
+  depends_on: []
+- name: Запустить тестовый контейнер
+  module: command
+  depends_on: []
+- name: Добавить пользователей в группу docker
+  module: user
+  depends_on: []
+- name: Добавить репозиторий Docker (RedOS/CentOS)
+  module: command
+  depends_on: []
