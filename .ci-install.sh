@@ -18,10 +18,10 @@ set -euxo pipefail
 #     содержат такие макросы → rpmbuild падает на %prep.
 #
 # Решение: обновить rpm до 4.18.x (поддерживает `%[ ]`), а БД мигрировать
-# из bdb в SQLite. Штатный `rpm --rebuilddb` в контейнере НЕ работает:
-# он делает rename("/var/lib/rpm", "/var/lib/rpmold.N"), а на overlayfs
-# это даёт EXDEV (Invalid cross-device link). Поэтому миграцию делаем вручную
-# тем же составом файлов, которые rebuilddb уже подготовил.
+# из bdb в SQLite. Поведение `rpm --rebuilddb` зависит от ФС: на обычной ФС
+# он сам подменяет /var/lib/rpm (и каталога rpmrebuilddb.* не остаётся),
+# а на overlayfs подмена падает с EXDEV (Invalid cross-device link) и
+# готовую БД нужно скопировать вручную. Оба сценария обработаны в шаге 3.
 # ---------------------------------------------------------------------------
 
 RPMDB_DIR=/var/lib/rpm
@@ -55,31 +55,38 @@ grep -H '^baseurl' /etc/yum.repos.d/*.repo
 dnf -y update rpm rpm-libs
 rpm --version
 
-# --- 3. Миграция БД: bdb -> sqlite -----------------------------------------
-# rpm >= 4.17 умеет только читать bdb ("bdb_ro backend"), поэтому после
-# обновления любая транзакция dnf падает:
-#   RPM: error: cannot open Packages index using bdb_ro - Operation not permitted
-#   RPM: error: cannot open Packages database in /var/lib/rpm
-#
-# `rpm --rebuilddb` конвертирует БД в sqlite, но не может подменить
-# каталог целиком на overlayfs (EXDEV). Поэтому:
-#   1) запускаем rebuilddb — он создаёт готовую sqlite-БД в
-#      /var/lib/rpmrebuilddb.<pid>/ (это делается даже при ошибке подмены);
-#   2) копируем полученные файлы в /var/lib/rpm/;
-#   3) удаляем устаревшие bdb-файлы, иначе rpm продолжит выбирать bdb_ro.
+# `rpm --rebuilddb` конвертирует БД в sqlite, но его поведение зависит
+# от ФС: он делает rename("/var/lib/rpm" -> "/var/lib/rpmold.N") с последующей
+# подменой каталога, а на overlayfs это даёт EXDEV (cross-device link).
+# Поэтому возможны два исхода:
+#   A) подмена удалась (обычная ФС в CI) - БД уже sqlite, делать нечего;
+#   B) подмена не удалась (overlayfs) - rpm оставляет готовую БД в
+#      /var/lib/rpmrebuilddb.<pid>/, её нужно скопировать вручную.
+# Оба случая обрабатываются ниже.
 if [ -f "$RPMDB_DIR/Packages" ]; then
+  # rebuilddb может завершиться с ошибкой (случай B) - это не фатально.
   rpm --rebuilddb || true
-  REBUILD_DIR="$(ls -d /var/lib/rpmrebuilddb.* 2>/dev/null | sort -V | tail -n1)"
-  [ -n "$REBUILD_DIR" ] && [ -f "$REBUILD_DIR/rpmdb.sqlite" ] || {
-    echo "ERROR: не удалось сконвертировать БД rpm в sqlite" >&2
-    exit 1
-  }
-  cp -f "$REBUILD_DIR"/rpmdb.sqlite "$RPMDB_DIR"/rpmdb.sqlite
-  [ -f "$REBUILD_DIR/rpmdb.sqlite-shm" ] && \
-    cp -f "$REBUILD_DIR"/rpmdb.sqlite-shm "$RPMDB_DIR"/rpmdb.sqlite-shm || true
-  [ -f "$REBUILD_DIR/rpmdb.sqlite-wal" ] && \
-    cp -f "$REBUILD_DIR"/rpmdb.sqlite-wal "$RPMDB_DIR"/rpmdb.sqlite-wal || true
-  rm -rf /var/lib/rpmrebuilddb.*
+
+  if [ -f "$RPMDB_DIR/rpmdb.sqlite" ]; then
+    # Случай A: БД уже сконвертирована и подменена на месте.
+    echo "rpmdb: конвертация выполнена на месте (rpmdb.sqlite)"
+  else
+    # Случай B: забираем БД из каталога, который оставил rebuilddb.
+    REBUILD_DIR="$(ls -d /var/lib/rpmrebuilddb.* 2>/dev/null | sort -V | tail -n1)"
+    if [ -z "$REBUILD_DIR" ] || [ ! -f "$REBUILD_DIR/rpmdb.sqlite" ]; then
+      echo "ERROR: не удалось сконвертировать БД rpm в sqlite" >&2
+      exit 1
+    fi
+    echo "rpmdb: копирование БД из $REBUILD_DIR"
+    cp -f "$REBUILD_DIR"/rpmdb.sqlite "$RPMDB_DIR"/rpmdb.sqlite
+    # WAL/SHM могут отсутствовать - под set -e падение [ -f ] недопустимо.
+    [ -f "$REBUILD_DIR/rpmdb.sqlite-shm" ] && \
+      cp -f "$REBUILD_DIR/rpmdb.sqlite-shm" "$RPMDB_DIR"/rpmdb.sqlite-shm || true
+    [ -f "$REBUILD_DIR/rpmdb.sqlite-wal" ] && \
+      cp -f "$REBUILD_DIR/rpmdb.sqlite-wal" "$RPMDB_DIR"/rpmdb.sqlite-wal || true
+  fi
+
+  rm -rf /var/lib/rpmrebuilddb.* /var/lib/rpmold.*
   # Удаляем legacy bdb-индексы, иначе rpm продолжит открывать bdb_ro.
   rm -f "$RPMDB_DIR"/Packages "$RPMDB_DIR"/Basenames "$RPMDB_DIR"/Conflictname \
         "$RPMDB_DIR"/Dirnames "$RPMDB_DIR"/Enhancename "$RPMDB_DIR"/Filetriggername \
@@ -91,6 +98,12 @@ if [ -f "$RPMDB_DIR/Packages" ]; then
         "$RPMDB_DIR"/Triggername "$RPMDB_DIR"/__db.*
 fi
 rm -f "$RPMDB_DIR"/.rebuilddb
+
+# Итоговая проверка: БД обязана быть в sqlite-формате, иначе dnf не работает.
+if [ ! -f "$RPMDB_DIR/rpmdb.sqlite" ]; then
+  echo "ERROR: БД rpm не переведена в sqlite" >&2
+  exit 1
+fi
 
 # --- 4. Проверка состояния БД ---------------------------------------------
 rpm -qa | wc -l
