@@ -24,27 +24,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build dependencies
-        run: |
-          set -x
-          # git нужен для actions/checkout, tar/gzip — для сборки тарбола,
-          # rpm-build — для rpmbuild.
-          dnf -y install git tar gzip which findutils rpm-build || true
-          dnf -y install libX11-devel libxcb-devel mesa-libGL-devel oniguruma-devel || true
-          for t in git tar gzip rpmbuild; do
-            command -v "$t" >/dev/null 2>&1 || { echo "ERROR: $t not available" >&2; exit 1; }
-          done
-          # Rust toolchain: in the base image cargo/rustc are present,
-          # otherwise try to install them from the distro repos.
-          if ! command -v cargo >/dev/null 2>&1; then
-            dnf -y install cargo rust || dnf -y install rust-toolset || true
-          fi
-          if ! command -v cargo >/dev/null 2>&1; then
-            echo "ERROR: cargo not available in the image" >&2
-            exit 1
-          fi
-          rpm --version
-          cargo --version
-          rustc --version
+        run: bash .ci-install.sh
 
       - name: Build RPM
         run: bash packaging/build-rpm.sh "$PWD" /root/rpmbuild

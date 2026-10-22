@@ -13,7 +13,9 @@
 # Скрипт сам нормализует переводы строк (CRLF -> LF) и перезапускает себя,
 # поэтому его безопасно вызывать прямо из Windows-источника.
 if [ -n "${BASH_VERSION:-}" ] && head -c 200 "$0" | grep -q $'\r'; then
-  exec bash <(tr -d '\r' < "$0") "$@"
+  _br_tmp="$(mktemp)"
+  tr -d '\r' < "$0" > "$_br_tmp"
+  exec bash "$_br_tmp" "$@"
 fi
 set -euo pipefail
 
