@@ -42,6 +42,7 @@ pub struct AnsibleApp {
     pub background_jobs: Vec<BackgroundJob>,
     pub job_rx: Option<mpsc::Receiver<BackgroundJob>>,
     pub run_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    pub stop_confirm: bool,
     pub show_about: bool,
     pub theme_idx: usize,
     pub lang: Lang,
@@ -124,6 +125,7 @@ impl Default for AnsibleApp {
             background_jobs: Vec::new(),
             job_rx: None,
             run_cancel: None,
+            stop_confirm: false,
             show_about: false,
             theme_idx: 0,
             lang: Lang::Ru,
@@ -572,6 +574,32 @@ impl AnsibleApp {
 
 impl eframe::App for AnsibleApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Горячие клавиши: F5 — запуск плейбука, Esc — подтверждение остановки
+        if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
+            if self.playbook_path.is_empty() {
+                self.error_message = Some("Укажите путь к плейбуку".into());
+            } else if !std::path::Path::new(&self.playbook_path).exists() {
+                self.error_message = Some(format!(
+                    "Плейбук не найден: {}",
+                    self.playbook_path
+                ));
+            } else if self.inventory_path.is_empty() {
+                self.error_message = Some("Укажите путь к инвентарю".into());
+            } else if !std::path::Path::new(&self.inventory_path).exists() {
+                self.error_message = Some(format!(
+                    "Инвентарь не найден: {}",
+                    self.inventory_path
+                ));
+            } else {
+                self.start_run();
+            }
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            if matches!(self.session.lock().unwrap().state, RunState::Running) {
+                self.stop_confirm = true;
+            }
+        }
+
         if let Some(rx) = &mut self.rx {
             while let Ok(ev) = rx.try_recv() {
                 if let Ok(mut s) = self.session.lock() {

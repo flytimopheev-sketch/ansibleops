@@ -28,15 +28,19 @@ fn badge(ui: &mut egui::Ui, label: &str, count: usize, color: Color32) {
 impl AnsibleApp {
     pub fn show_run(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("sidebar")
-            .default_width(330.0)
+            .default_width(420.0)
             .frame(Frame::none().inner_margin(Margin::same(14.0)))
             .show(ctx, |ui| {
-                ui.heading(RichText::new("📂 Configuration").color(c_purple()));
-                ui.add_space(8.0);
-                ui.label(RichText::new("Inventory").color(c_tm()));
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.heading(RichText::new("📂 Configuration").color(c_purple()));
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Inventory").color(c_tm()));
                 ui.horizontal(|ui| {
                     ui.text_edit_singleline(&mut self.inventory_path);
-                    if ui.button("📂").clicked() {
+                    if ui.button("📂 Обзор")
+                        .on_hover_text("Выбрать файл инвентаря")
+                        .clicked()
+                    {
                         if let Some(path) = rfd::FileDialog::new()
                             .add_filter(
                                 "Ansible Inventory",
@@ -52,7 +56,10 @@ impl AnsibleApp {
                 ui.label(RichText::new("Playbook").color(c_tm()));
                 ui.horizontal(|ui| {
                     ui.text_edit_singleline(&mut self.playbook_path);
-                    if ui.button("📂").clicked() {
+                    if ui.button("📂 Обзор")
+                        .on_hover_text("Выбрать файл плейбука")
+                        .clicked()
+                    {
                         if let Some(path) = rfd::FileDialog::new()
                             .add_filter("YAML Files", &["yml", "yaml"])
                             .pick_file()
@@ -99,7 +106,10 @@ impl AnsibleApp {
                         .map(|p| p.to_string_lossy().into_owned())
                         .unwrap_or_default();
                     ui.text_edit_singleline(&mut kp);
-                    if ui.button("📂").clicked() {
+                    if ui.button("📂 Ключ")
+                        .on_hover_text("Выбрать SSH-ключ")
+                        .clicked()
+                    {
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
                             kp = path.to_string_lossy().into_owned();
                         }
@@ -133,14 +143,30 @@ impl AnsibleApp {
                             })
                             .color(Color32::WHITE)
                             .strong(),
-                        )
+                        .on_hover_text("Запустить плейбук")
                         .fill(c_green())
                         .min_size(Vec2::new(ui.available_width(), 42.0))
                         .rounding(Rounding::same(10.0)),
                     )
                     .clicked()
                 {
-                    self.start_run();
+                    if self.playbook_path.is_empty() {
+                        self.error_message = Some("Укажите путь к плейбуку".into());
+                    } else if !std::path::Path::new(&self.playbook_path).exists() {
+                        self.error_message = Some(format!(
+                            "Плейбук не найден: {}",
+                            self.playbook_path
+                        ));
+                    } else if self.inventory_path.is_empty() {
+                        self.error_message = Some("Укажите путь к инвентарю".into());
+                    } else if !std::path::Path::new(&self.inventory_path).exists() {
+                        self.error_message = Some(format!(
+                            "Инвентарь не найден: {}",
+                            self.inventory_path
+                        ));
+                    } else {
+                        self.start_run();
+                    }
                 }
                 if running
                     && ui
@@ -149,13 +175,14 @@ impl AnsibleApp {
                             egui::Button::new(
                                 RichText::new("⏹ Остановить").color(Color32::WHITE).strong(),
                             )
+                            .on_hover_text("Остановить выполнение плейбука")
                             .fill(c_red())
                             .min_size(Vec2::new(ui.available_width(), 32.0))
                             .rounding(Rounding::same(10.0)),
                         )
                         .clicked()
                 {
-                    self.stop_run();
+                    self.stop_confirm = true;
                 }
                 ui.add_space(16.0);
                 ui.heading(RichText::new("🖥 Hosts").color(c_purple()));
@@ -182,7 +209,29 @@ impl AnsibleApp {
                         ui.add_space(4.0);
                     }
                 });
+                });
             });
+        // Подтверждение остановки
+        if self.stop_confirm {
+            egui::Window::new("⏹ Остановить выполнение?")
+                .collapsible(false)
+                .resizable(false)
+                .default_size(Vec2::new(340.0, 120.0))
+                .show(ctx, |ui| {
+                    ui.label("Вы уверены, что хотите остановить выполнение плейбука?");
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if ui.button("Да, остановить").clicked() {
+                            self.stop_run();
+                            self.stop_confirm = false;
+                        }
+                        ui.add_space(8.0);
+                        if ui.button("Отмена").clicked() {
+                            self.stop_confirm = false;
+                        }
+                    });
+                });
+        }
         egui::CentralPanel::default()
             .frame(Frame::none().inner_margin(Margin::same(14.0)))
             .show(ctx, |ui| {
