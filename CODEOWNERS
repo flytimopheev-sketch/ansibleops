@@ -1,0 +1,12 @@
+# Владельцы кода AnsibleOps
+
+# Владелец всего репозитория
+* @flytimopheev-sketch
+
+# Документация и оформление
+/docs/ @flytimopheev-sketch
+/*.md @flytimopheev-sketch
+
+# Упаковка и CI
+/packaging/ @flytimopheev-sketch
+/.github/ @flytimopheev-sketch
