@@ -363,7 +363,7 @@ impl AnsibleApp {
         let hosts = self.ops.hosts.clone();
         let enforce = self.ops.comp_enforce;
         let (tx, rx) = std::sync::mpsc::channel();
-        self.comp_rx = Some(rx);
+        self.scheduler_compliance.comp_rx = Some(rx);
         std::thread::spawn(move || {
             for c in checks {
                 let audit = ops::comp_audit_cmd(&c);

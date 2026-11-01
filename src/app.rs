@@ -1,4 +1,4 @@
-use crate::ansible::editor::YamlEditor;
+﻿use crate::ansible::editor::YamlEditor;
 use crate::ansible::graph::TaskGraph;
 use crate::ansible::history::HistoryStore;
 use crate::ansible::runner::AnsibleRunner;
@@ -29,8 +29,6 @@ pub struct AnsibleApp {
     pub rx: Option<mpsc::Receiver<TaskEvent>>,
     pub tf_rx: Option<mpsc::Receiver<TfEvent>>,
     pub tf_log: Vec<TfEvent>,
-    pub auto_scroll: bool,
-    pub error_message: Option<String>,
     pub config_path: PathBuf,
     pub constructor_play: ConstructorPlay,
     pub show_yaml_preview: bool,
@@ -43,43 +41,22 @@ pub struct AnsibleApp {
     pub job_rx: Option<mpsc::Receiver<BackgroundJob>>,
     pub run_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     pub stop_confirm: bool,
-    pub show_about: bool,
-    pub theme_idx: usize,
-    pub lang: Lang,
-    pub toasts: Vec<(String, Instant)>,
-    pub diag_results: Vec<DiagResult>,
-    pub diag_port: String,
-    pub diag_rx: Option<std::sync::mpsc::Receiver<Vec<DiagResult>>>,
-    pub report_format: String,
+    pub ui: UiState,
+    pub web: WebConfig,
+    pub zabbix: ZabbixConfig,
+    pub rpm_git: RpmGitConfig,
+    pub scheduler_compliance: SchedulerComplianceState,
+    pub diff_versions: DiffVersionsState,
     pub vault_file: String,
     pub vault_pass: String,
     pub vault_out: String,
-    pub rpm_dir: String,
-    pub rpm_out: String,
-    pub git_dir: String,
-    pub git_out: String,
-    pub git_msg: String,
-    pub sched_tasks: Vec<SchedTask>,
-    pub zbx_server: String,
-    pub zbx_port: String,
-    pub zbx_out: String,
-    pub web_on: bool,
-    pub web_bind: String,
-    pub web_token: String,
-    pub api_port_str: String,
-    pub ansible_version: String,
-    pub show_palette: bool,
-    pub palette_query: String,
-    pub theme_dirty: bool,
     pub ops: OpsState,
     pub ops_rx: Option<std::sync::mpsc::Receiver<String>>,
-    pub comp_rx: Option<std::sync::mpsc::Receiver<ComplianceResult>>,
-    pub diff: DiffState,
-    pub diff_rx: Option<std::sync::mpsc::Receiver<String>>,
-    pub versions: Option<crate::ansible::diff::VersionStore>,
+    pub report_format: String,
+    pub diag_results: Vec<DiagResult>,
+    pub diag_port: String,
+    pub diag_rx: Option<std::sync::mpsc::Receiver<Vec<DiagResult>>>,
     pub roles: RolesState,
-    pub rule_rx: Option<std::sync::mpsc::Receiver<String>>,
-    pub last_rule_check: Instant,
 }
 
 impl Default for AnsibleApp {
@@ -109,8 +86,6 @@ impl Default for AnsibleApp {
             rx: None,
             tf_rx: None,
             tf_log: Vec::new(),
-            auto_scroll: true,
-            error_message: None,
             config_path,
             constructor_play: ConstructorPlay::default(),
             show_yaml_preview: false,
@@ -126,45 +101,48 @@ impl Default for AnsibleApp {
             job_rx: None,
             run_cancel: None,
             stop_confirm: false,
-            show_about: false,
-            theme_idx: 0,
-            lang: Lang::Ru,
-            toasts: Vec::new(),
-            diag_results: Vec::new(),
-            diag_port: "80".into(),
-            diag_rx: None,
-            report_format: "html".into(),
+            ui: UiState {
+                auto_scroll: true,
+                lang: Lang::Ru,
+                ..Default::default()
+            },
+            web: WebConfig {
+                enabled: false,
+                bind: "127.0.0.1".into(),
+                token: crate::ansible::webapi::generate_token(),
+                api_port: "8080".into(),
+                ..Default::default()
+            },
+            zabbix: ZabbixConfig {
+                server: "127.0.0.1".into(),
+                port: "10051".into(),
+                ..Default::default()
+            },
+            rpm_git: RpmGitConfig {
+                git_msg: "update playbooks".into(),
+                ..Default::default()
+            },
+            scheduler_compliance: SchedulerComplianceState {
+                last_rule_check: Instant::now(),
+                ..Default::default()
+            },
+            diff_versions: DiffVersionsState {
+                diff: DiffState::default(),
+                versions: crate::ansible::diff::VersionStore::new().ok(),
+                ..Default::default()
+            },
             vault_file: String::new(),
             vault_pass: String::new(),
             vault_out: String::new(),
-            rpm_dir: String::new(),
-            rpm_out: String::new(),
-            git_dir: String::new(),
-            git_out: String::new(),
-            git_msg: "update playbooks".into(),
-            sched_tasks: Vec::new(),
-            zbx_server: "127.0.0.1".into(),
-            zbx_port: "10051".into(),
-            zbx_out: String::new(),
-            web_on: false,
-            web_bind: "127.0.0.1".into(),
-            web_token: crate::ansible::webapi::generate_token(),
-            api_port_str: "8080".into(),
-            ansible_version: String::new(),
-            show_palette: false,
-            palette_query: String::new(),
-            theme_dirty: false,
             ops: OpsState {
                 hosts: "all".into(),
                 ..Default::default()
             },
             ops_rx: None,
-            comp_rx: None,
-            rule_rx: None,
-            last_rule_check: Instant::now(),
-            diff: DiffState::default(),
-            diff_rx: None,
-            versions: crate::ansible::diff::VersionStore::new().ok(),
+            report_format: "html".into(),
+            diag_results: Vec::new(),
+            diag_port: "80".into(),
+            diag_rx: None,
             roles: RolesState::default(),
         }
     }
@@ -186,13 +164,13 @@ impl AnsibleApp {
     }
 
     pub fn toast(&mut self, msg: String) {
-        self.toasts.push((msg, Instant::now()));
+        self.ui.toasts.push((msg, Instant::now()));
     }
 
     fn cycle_theme(&mut self, ctx: &egui::Context) {
-        self.theme_idx = (self.theme_idx + 1) % 4;
-        apply_theme(ctx, self.theme_idx);
-        self.toast(format!("🎨 Тема: {}", THEME_NAMES[self.theme_idx]));
+        self.ui.theme_idx = (self.ui.theme_idx + 1) % 4;
+        apply_theme(ctx, self.ui.theme_idx);
+        self.toast(format!("рџЋЁ РўРµРјР°: {}", THEME_NAMES[self.ui.theme_idx]));
     }
 
     fn load_config(&mut self) {
@@ -206,8 +184,8 @@ impl AnsibleApp {
                 self.extra_vars = config.extra_vars;
                 self.ssh = config.ssh;
                 self.tab = config.last_tab;
-                self.theme_idx = config.theme;
-                self.theme_dirty = true;
+                self.ui.theme_idx = config.theme;
+                self.ui.theme_dirty = true;
             }
         }
     }
@@ -219,7 +197,7 @@ impl AnsibleApp {
             extra_vars: self.extra_vars.clone(),
             ssh: self.ssh.clone(),
             last_tab: self.tab,
-            theme: self.theme_idx,
+            theme: self.ui.theme_idx,
         };
         if let Ok(json) = serde_json::to_string_pretty(&config) {
             let _ = std::fs::write(&self.config_path, json);
@@ -235,7 +213,7 @@ impl AnsibleApp {
     }
 
     pub fn start_run(&mut self) {
-        self.error_message = None;
+        self.ui.error_message = None;
         if let Ok(mut s) = self.session.lock() {
             *s = RunSession::new(self.playbook_path.clone(), self.inventory_path.clone());
             s.state = RunState::Running;
@@ -255,7 +233,7 @@ impl AnsibleApp {
         let store = self.history_store.clone();
         let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         self.run_cancel = Some(cancel.clone());
-        // Собираем секретные значения из extra vars для маскирования в логах
+        // РЎРѕР±РёСЂР°РµРј СЃРµРєСЂРµС‚РЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РёР· extra vars РґР»СЏ РјР°СЃРєРёСЂРѕРІР°РЅРёСЏ РІ Р»РѕРіР°С…
         let secrets = Self::extract_secrets(&vars.clone().unwrap_or_default());
         tokio::spawn(async move {
             let ok = AnsibleRunner::run_cancellable(
@@ -281,7 +259,7 @@ impl AnsibleApp {
         });
     }
 
-    /// Остановка текущего запуска: прерывание процесса ansible-playbook.
+    /// РћСЃС‚Р°РЅРѕРІРєР° С‚РµРєСѓС‰РµРіРѕ Р·Р°РїСѓСЃРєР°: РїСЂРµСЂС‹РІР°РЅРёРµ РїСЂРѕС†РµСЃСЃР° ansible-playbook.
     pub fn stop_run(&mut self) {
         if let Some(c) = &self.run_cancel {
             c.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -291,15 +269,15 @@ impl AnsibleApp {
             if matches!(s.state, RunState::Running) {
                 let done = s.summary.ok + s.summary.changed + s.summary.failed + s.summary.skipped;
                 msg = Some(format!(
-                    "⏹ Остановка... Завершено событий: {}. Состояние: прервано пользователем",
+                    "вЏ№ РћСЃС‚Р°РЅРѕРІРєР°... Р—Р°РІРµСЂС€РµРЅРѕ СЃРѕР±С‹С‚РёР№: {}. РЎРѕСЃС‚РѕСЏРЅРёРµ: РїСЂРµСЂРІР°РЅРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј",
                     done
                 ));
                 s.events.push(crate::models::TaskEvent {
-                    task: "Остановка".into(),
+                    task: "РћСЃС‚Р°РЅРѕРІРєР°".into(),
                     host: "all".into(),
                     status: crate::models::TaskStatus::Failed,
                     duration_ms: 0,
-                    output: "Прервано пользователем".into(),
+                    output: "РџСЂРµСЂРІР°РЅРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј".into(),
                     timestamp: chrono::Local::now(),
                 });
             }
@@ -309,7 +287,7 @@ impl AnsibleApp {
         }
     }
 
-    /// Извлечение значений секретных переменных из extra vars (k=v, "k": "v", k: v).
+    /// РР·РІР»РµС‡РµРЅРёРµ Р·РЅР°С‡РµРЅРёР№ СЃРµРєСЂРµС‚РЅС‹С… РїРµСЂРµРјРµРЅРЅС‹С… РёР· extra vars (k=v, "k": "v", k: v).
     fn extract_secrets(extra_vars: &str) -> Vec<String> {
         let mut out = Vec::new();
         for line in extra_vars.lines() {
@@ -352,10 +330,10 @@ impl AnsibleApp {
     }
 
     pub fn load_playbook_graph(&mut self) {
-        self.error_message = None;
+        self.ui.error_message = None;
         let path = std::path::Path::new(&self.playbook_path);
         if let Err(e) = self.editor.load(path) {
-            self.error_message = Some(format!("Не удалось открыть файл: {}", e));
+            self.ui.error_message = Some(format!("РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ С„Р°Р№Р»: {}", e));
             return;
         }
         if let Ok(content) = std::fs::read_to_string(path) {
@@ -434,9 +412,9 @@ impl AnsibleApp {
                 if let Some(path) = &self.editor.path {
                     let path_clone = path.clone();
                     if let Err(e) = std::fs::write(&path_clone, yaml) {
-                        self.error_message = Some(format!("Ошибка сохранения: {}", e));
+                        self.ui.error_message = Some(format!("РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ: {}", e));
                     } else {
-                        self.error_message = None;
+                        self.ui.error_message = None;
                         if let Some(g) = &mut self.graph {
                             g.order_changed = false;
                         }
@@ -493,9 +471,9 @@ impl AnsibleApp {
             .save_file()
         {
             if let Err(e) = std::fs::write(&path, yaml) {
-                self.error_message = Some(format!("Ошибка сохранения: {}", e));
+                self.ui.error_message = Some(format!("РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ: {}", e));
             } else {
-                self.error_message = None;
+                self.ui.error_message = None;
                 let _ = self.editor.load(&path);
                 self.playbook_path = path.to_string_lossy().into_owned();
             }
@@ -504,28 +482,28 @@ impl AnsibleApp {
 
     fn commands(&self) -> Vec<(String, String)> {
         vec![
-            ("tab:Run".into(), "▶ Перейти: Run".into()),
-            ("tab:Editor".into(), "📝 Перейти: Editor".into()),
-            ("tab:Constructor".into(), "🏗 Перейти: Constructor".into()),
-            ("tab:Admin".into(), "🛠 Перейти: Admin".into()),
-            ("tab:AdHoc".into(), "💻 Перейти: Ad-Hoc".into()),
-            ("tab:Library".into(), "📚 Перейти: Library".into()),
-            ("tab:Roles".into(), "📦 Перейти: Roles".into()),
-            ("tab:Diff".into(), "🔍 Перейти: Diff".into()),
-            ("tab:Graph".into(), "🕸 Перейти: Graph".into()),
-            ("tab:Terraform".into(), "🌍 Перейти: Terraform".into()),
-            ("tab:Tools".into(), "🧰 Перейти: Tools".into()),
-            ("tab:History".into(), "🗂 Перейти: History".into()),
-            ("tab:Domain".into(), "🖥 Перейти: Domain".into()),
-            ("tab:Profiles".into(), "🧾 Перейти: Profiles".into()),
-            ("tab:Workflow".into(), "🔀 Перейти: Workflow".into()),
-            ("tab:Ops".into(), "⚡ Перейти: OpsCenter".into()),
-            ("tab:Compliance".into(), "🛡 Перейти: Compliance".into()),
-            ("act:run".into(), "🚀 Запустить playbook".into()),
-            ("act:theme".into(), "🎨 Сменить тему".into()),
-            ("act:clear".into(), "🧹 Очистить лог".into()),
-            ("act:save".into(), "💾 Сохранить editor".into()),
-            ("act:about".into(), "ℹ️ О программе".into()),
+            ("tab:Run".into(), "в–¶ РџРµСЂРµР№С‚Рё: Run".into()),
+            ("tab:Editor".into(), "рџ“ќ РџРµСЂРµР№С‚Рё: Editor".into()),
+            ("tab:Constructor".into(), "рџЏ— РџРµСЂРµР№С‚Рё: Constructor".into()),
+            ("tab:Admin".into(), "рџ›  РџРµСЂРµР№С‚Рё: Admin".into()),
+            ("tab:AdHoc".into(), "рџ’» РџРµСЂРµР№С‚Рё: Ad-Hoc".into()),
+            ("tab:Library".into(), "рџ“љ РџРµСЂРµР№С‚Рё: Library".into()),
+            ("tab:Roles".into(), "рџ“¦ РџРµСЂРµР№С‚Рё: Roles".into()),
+            ("tab:Diff".into(), "рџ”Ќ РџРµСЂРµР№С‚Рё: Diff".into()),
+            ("tab:Graph".into(), "рџ•ё РџРµСЂРµР№С‚Рё: Graph".into()),
+            ("tab:Terraform".into(), "рџЊЌ РџРµСЂРµР№С‚Рё: Terraform".into()),
+            ("tab:Tools".into(), "рџ§° РџРµСЂРµР№С‚Рё: Tools".into()),
+            ("tab:History".into(), "рџ—‚ РџРµСЂРµР№С‚Рё: History".into()),
+            ("tab:Domain".into(), "рџ–Ґ РџРµСЂРµР№С‚Рё: Domain".into()),
+            ("tab:Profiles".into(), "рџ§ѕ РџРµСЂРµР№С‚Рё: Profiles".into()),
+            ("tab:Workflow".into(), "рџ”Ђ РџРµСЂРµР№С‚Рё: Workflow".into()),
+            ("tab:Ops".into(), "вљЎ РџРµСЂРµР№С‚Рё: OpsCenter".into()),
+            ("tab:Compliance".into(), "рџ›Ў РџРµСЂРµР№С‚Рё: Compliance".into()),
+            ("act:run".into(), "рџљЂ Р—Р°РїСѓСЃС‚РёС‚СЊ playbook".into()),
+            ("act:theme".into(), "рџЋЁ РЎРјРµРЅРёС‚СЊ С‚РµРјСѓ".into()),
+            ("act:clear".into(), "рџ§№ РћС‡РёСЃС‚РёС‚СЊ Р»РѕРі".into()),
+            ("act:save".into(), "рџ’ѕ РЎРѕС…СЂР°РЅРёС‚СЊ editor".into()),
+            ("act:about".into(), "в„№пёЏ Рћ РїСЂРѕРіСЂР°РјРјРµ".into()),
         ]
     }
 
@@ -550,11 +528,11 @@ impl AnsibleApp {
             "tab:Compliance" => self.tab = Tab::Compliance,
             "act:run" => {
                 self.start_run();
-                self.toast("🚀 Запуск".into());
+                self.toast("рџљЂ Р—Р°РїСѓСЃРє".into());
             }
             "act:theme" => {
-                self.theme_idx = (self.theme_idx + 1) % 4;
-                self.theme_dirty = true;
+                self.ui.theme_idx = (self.ui.theme_idx + 1) % 4;
+                self.ui.theme_dirty = true;
             }
             "act:clear" => {
                 if let Ok(mut s) = self.session.lock() {
@@ -564,9 +542,9 @@ impl AnsibleApp {
             }
             "act:save" => {
                 let _ = self.editor.save();
-                self.toast("💾 Сохранено".into());
+                self.toast("рџ’ѕ РЎРѕС…СЂР°РЅРµРЅРѕ".into());
             }
-            "act:about" => self.show_about = true,
+            "act:about" => self.ui.show_about = true,
             _ => {}
         }
     }
@@ -574,20 +552,20 @@ impl AnsibleApp {
 
 impl eframe::App for AnsibleApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Горячие клавиши: F5 — запуск плейбука, Esc — подтверждение остановки
+        // Р“РѕСЂСЏС‡РёРµ РєР»Р°РІРёС€Рё: F5 вЂ” Р·Р°РїСѓСЃРє РїР»РµР№Р±СѓРєР°, Esc вЂ” РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РѕСЃС‚Р°РЅРѕРІРєРё
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             if self.playbook_path.is_empty() {
-                self.error_message = Some("Укажите путь к плейбуку".into());
+                self.ui.error_message = Some("РЈРєР°Р¶РёС‚Рµ РїСѓС‚СЊ Рє РїР»РµР№Р±СѓРєСѓ".into());
             } else if !std::path::Path::new(&self.playbook_path).exists() {
-                self.error_message = Some(format!(
-                    "Плейбук не найден: {}",
+                self.ui.error_message = Some(format!(
+                    "РџР»РµР№Р±СѓРє РЅРµ РЅР°Р№РґРµРЅ: {}",
                     self.playbook_path
                 ));
             } else if self.inventory_path.is_empty() {
-                self.error_message = Some("Укажите путь к инвентарю".into());
+                self.ui.error_message = Some("РЈРєР°Р¶РёС‚Рµ РїСѓС‚СЊ Рє РёРЅРІРµРЅС‚Р°СЂСЋ".into());
             } else if !std::path::Path::new(&self.inventory_path).exists() {
-                self.error_message = Some(format!(
-                    "Инвентарь не найден: {}",
+                self.ui.error_message = Some(format!(
+                    "РРЅРІРµРЅС‚Р°СЂСЊ РЅРµ РЅР°Р№РґРµРЅ: {}",
                     self.inventory_path
                 ));
             } else {
@@ -595,8 +573,10 @@ impl eframe::App for AnsibleApp {
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
-            if matches!(self.session.lock().unwrap().state, RunState::Running) {
-                self.stop_confirm = true;
+            if let Ok(s) = self.session.lock() {
+                if matches!(s.state, RunState::Running) {
+                    self.stop_confirm = true;
+                }
             }
         }
 
@@ -621,26 +601,26 @@ impl eframe::App for AnsibleApp {
                 }
             }
         }
-        if let Some(rx) = &mut self.comp_rx {
+        if let Some(rx) = &mut self.scheduler_compliance.comp_rx {
             while let Ok(r) = rx.try_recv() {
                 self.ops.comp_results.push(r);
             }
         }
-        if let Some(rx) = &mut self.diff_rx {
+        if let Some(rx) = &mut self.diff_versions.diff_rx {
             let mut buf = String::new();
             while let Ok(line) = rx.try_recv() {
                 buf.push_str(&line);
                 buf.push('\n');
             }
             if !buf.is_empty() {
-                self.diff.scan_running = false;
-                self.diff.changes = crate::ansible::diff::parse_check_output(&buf);
-                self.toast(format!("🔍 Найдено изменений: {}", self.diff.changes.len()));
+                self.diff_versions.diff.scan_running = false;
+                self.diff_versions.diff.changes = crate::ansible::diff::parse_check_output(&buf);
+                self.toast(format!("рџ”Ќ РќР°Р№РґРµРЅРѕ РёР·РјРµРЅРµРЅРёР№: {}", self.diff_versions.diff.changes.len()));
             }
         }
-        // Event-правила: каждые 60 сек
-        if self.last_rule_check.elapsed() > Duration::from_secs(60) {
-            self.last_rule_check = Instant::now();
+        // Event-РїСЂР°РІРёР»Р°: РєР°Р¶РґС‹Рµ 60 СЃРµРє
+        if self.scheduler_compliance.last_rule_check.elapsed() > Duration::from_secs(60) {
+            self.scheduler_compliance.last_rule_check = Instant::now();
             let active: Vec<EventRule> = self
                 .ops
                 .rules
@@ -651,11 +631,11 @@ impl eframe::App for AnsibleApp {
             if !active.is_empty() {
                 let hosts = self.ops.hosts.clone();
                 let (tx, rx) = std::sync::mpsc::channel();
-                self.rule_rx = Some(rx);
+                self.scheduler_compliance.rule_rx = Some(rx);
                 let pending: Vec<EventRule> = {
                     let mut out = Vec::new();
                     for r in &active {
-                        // Cooldown и лимит запусков
+                        // Cooldown Рё Р»РёРјРёС‚ Р·Р°РїСѓСЃРєРѕРІ
                         if let Some(t) = r.last_run {
                             if t.elapsed() < Duration::from_secs(r.cooldown_secs.max(1)) {
                                 continue;
@@ -664,15 +644,15 @@ impl eframe::App for AnsibleApp {
                         if r.runs >= r.max_runs {
                             continue;
                         }
-                        // Ограничение по хостам: пустое = hosts из OpsCenter
+                        // РћРіСЂР°РЅРёС‡РµРЅРёРµ РїРѕ С…РѕСЃС‚Р°Рј: РїСѓСЃС‚РѕРµ = hosts РёР· OpsCenter
                         let target = if r.allowed_hosts.is_empty() {
                             hosts.clone()
                         } else {
                             r.allowed_hosts.clone()
                         };
                         if let Some(msg) = ops::check_rule(&r.kind, &r.param, &target) {
-                            let _ = tx.send(format!("⚠️ [{}] {}", r.kind, msg));
-                            // Произвольный shell в автореакции запрещён без подтверждения
+                            let _ = tx.send(format!("вљ пёЏ [{}] {}", r.kind, msg));
+                            // РџСЂРѕРёР·РІРѕР»СЊРЅС‹Р№ shell РІ Р°РІС‚РѕСЂРµР°РєС†РёРё Р·Р°РїСЂРµС‰С‘РЅ Р±РµР· РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ
                             if r.action.is_empty() {
                                 continue;
                             }
@@ -713,13 +693,13 @@ impl eframe::App for AnsibleApp {
                                 || r.action.contains("shutdown")
                                 || r.action.contains("mkfs")
                             {
-                                "ОПАСНО: "
+                                "РћРџРђРЎРќРћ: "
                             } else {
                                 ""
                             }
                         );
                         self.ops.rule_log.push(format!(
-                            "⏸ Правило {} требует подтверждения действия: {}",
+                            "вЏё РџСЂР°РІРёР»Рѕ {} С‚СЂРµР±СѓРµС‚ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ РґРµР№СЃС‚РІРёСЏ: {}",
                             desc, r.action
                         ));
                         self.ops.pending_rules.push(r);
@@ -735,34 +715,34 @@ impl eframe::App for AnsibleApp {
             }
         }
         if diag_done {
-            self.toast("🩺 Диагностика завершена".into());
+            self.toast("рџ©є Р”РёР°РіРЅРѕСЃС‚РёРєР° Р·Р°РІРµСЂС€РµРЅР°".into());
         }
         ctx.request_repaint_after(Duration::from_millis(100));
 
-        if self.theme_dirty {
-            apply_theme(ctx, self.theme_idx);
-            self.theme_dirty = false;
+        if self.ui.theme_dirty {
+            apply_theme(ctx, self.ui.theme_idx);
+            self.ui.theme_dirty = false;
         }
 
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::R))
             && self.tab == Tab::Run
         {
             self.start_run();
-            self.toast("🚀 Запуск (Ctrl+R)".into());
+            self.toast("рџљЂ Р—Р°РїСѓСЃРє (Ctrl+R)".into());
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S))
             && self.tab == Tab::Editor
         {
             let _ = self.editor.save();
-            self.toast("💾 Сохранено (Ctrl+S)".into());
+            self.toast("рџ’ѕ РЎРѕС…СЂР°РЅРµРЅРѕ (Ctrl+S)".into());
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::P)) {
-            self.show_palette = !self.show_palette;
-            self.palette_query.clear();
+            self.ui.show_palette = !self.ui.show_palette;
+            self.ui.palette_query.clear();
         }
 
         let mut due_tasks: Vec<(String, String)> = Vec::new();
-        for t in self.sched_tasks.iter_mut() {
+        for t in self.scheduler_compliance.sched_tasks.iter_mut() {
             let due = match t.last_run {
                 Some(l) => l.elapsed() > Duration::from_secs(t.interval_min * 60),
                 None => true,
@@ -776,10 +756,10 @@ impl eframe::App for AnsibleApp {
             self.playbook_path = pb.clone();
             self.inventory_path = inv;
             self.start_run();
-            self.toast(format!("⏰ Планировщик: {}", pb));
+            self.toast(format!("вЏ° РџР»Р°РЅРёСЂРѕРІС‰РёРє: {}", pb));
         }
 
-        self.toasts
+        self.ui.toasts
             .retain(|(_, t)| t.elapsed() < Duration::from_secs(4));
         if ctx.input(|i| i.viewport().close_requested()) {
             self.save_config();
@@ -804,7 +784,7 @@ impl eframe::App for AnsibleApp {
                     ui.painter().text(
                         rect.center(),
                         egui::Align2::CENTER_CENTER,
-                        "⚡",
+                        "вљЎ",
                         egui::FontId::proportional(16.0),
                         c_blue(),
                     );
@@ -816,56 +796,56 @@ impl eframe::App for AnsibleApp {
                             .size(12.0),
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.small_button("ℹ️ О программе").clicked() {
-                            self.show_about = true;
+                        if ui.small_button("в„№пёЏ Рћ РїСЂРѕРіСЂР°РјРјРµ").clicked() {
+                            self.ui.show_about = true;
                         }
-                        if ui.small_button("🔄").clicked() {
+                        if ui.small_button("рџ”„").clicked() {
                             let url = format!("{}/releases/latest/download/VERSION", APP_REPO);
                             match ureq::get(&url).timeout(Duration::from_secs(5)).call() {
                                 Ok(r) => {
                                     let latest =
                                         r.into_string().unwrap_or_default().trim().to_string();
                                     if latest.is_empty() {
-                                        self.toast("🔄 Сервис обновлений: пустой ответ".into());
+                                        self.toast("рџ”„ РЎРµСЂРІРёСЃ РѕР±РЅРѕРІР»РµРЅРёР№: РїСѓСЃС‚РѕР№ РѕС‚РІРµС‚".into());
                                     } else if latest == APP_VERSION {
                                         self.toast(format!(
-                                            "🔄 Установлена актуальная версия ({})",
+                                            "рџ”„ РЈСЃС‚Р°РЅРѕРІР»РµРЅР° Р°РєС‚СѓР°Р»СЊРЅР°СЏ РІРµСЂСЃРёСЏ ({})",
                                             latest
                                         ));
                                     } else {
-                                        self.toast(format!("🔄 Доступна новая версия: {}", latest));
+                                        self.toast(format!("рџ”„ Р”РѕСЃС‚СѓРїРЅР° РЅРѕРІР°СЏ РІРµСЂСЃРёСЏ: {}", latest));
                                     }
                                 }
-                                Err(_) => self.toast("🔄 Сервис обновлений недоступен".into()),
+                                Err(_) => self.toast("рџ”„ РЎРµСЂРІРёСЃ РѕР±РЅРѕРІР»РµРЅРёР№ РЅРµРґРѕСЃС‚СѓРїРµРЅ".into()),
                             }
                         }
                         if ui
-                            .small_button(format!("🎨 {}", THEME_NAMES[self.theme_idx]))
+                            .small_button(format!("рџЋЁ {}", THEME_NAMES[self.ui.theme_idx]))
                             .clicked()
                         {
                             self.cycle_theme(ctx);
                         }
                         if ui
-                            .small_button(if self.lang == Lang::Ru { "RU" } else { "EN" })
+                            .small_button(if self.ui.lang == Lang::Ru { "RU" } else { "EN" })
                             .clicked()
                         {
-                            self.lang = if self.lang == Lang::Ru {
+                            self.ui.lang = if self.ui.lang == Lang::Ru {
                                 Lang::En
                             } else {
                                 Lang::Ru
                             };
                         }
                         ui.add_space(8.0);
-                        let s = self.session.lock().unwrap();
-                        match &s.state {
-                            RunState::Idle => ui.colored_label(c_tm(), "● Idle"),
-                            RunState::Running => ui.colored_label(c_orange(), "● Running"),
+                        let state = self.session.lock().map(|s| s.state).unwrap_or(RunState::Idle);
+                        match &state {
+                            RunState::Idle => ui.colored_label(c_tm(), "в—Џ Idle"),
+                            RunState::Running => ui.colored_label(c_orange(), "в—Џ Running"),
                             RunState::Finished { success } => ui.colored_label(
                                 if *success { c_green() } else { c_red() },
                                 if *success {
-                                    "● Success"
+                                    "в—Џ Success"
                                 } else {
-                                    "● Failed"
+                                    "в—Џ Failed"
                                 },
                             ),
                         };
@@ -880,23 +860,23 @@ impl eframe::App for AnsibleApp {
                 ui.add_space(6.0);
                 ui.vertical_centered(|ui| {
                     let nav: Vec<(Tab, &str, &str)> = vec![
-                        (Tab::Run, "▶", "Run"),
-                        (Tab::Editor, "📝", "Editor"),
-                        (Tab::Constructor, "🏗", "Constructor"),
-                        (Tab::Admin, "🛠", "Admin"),
-                        (Tab::AdHoc, "💻", "Ad-Hoc"),
-                        (Tab::Library, "📚", "Library"),
-                        (Tab::Roles, "📦", "Roles"),
-                        (Tab::DiffView, "🔍", "Diff"),
-                        (Tab::Graph, "🕸", "Graph"),
-                        (Tab::Terraform, "🌍", "Terraform"),
-                        (Tab::Tools, "🧰", "Tools"),
-                        (Tab::History, "🗂", "History"),
-                        (Tab::Domain, "🖥", "Domain"),
-                        (Tab::Profiles, "🧾", "Profiles"),
-                        (Tab::Workflow, "🔀", "Workflow"),
-                        (Tab::OpsCenter, "⚡", "OpsCenter"),
-                        (Tab::Compliance, "🛡", "Compliance"),
+                        (Tab::Run, "в–¶", "Run"),
+                        (Tab::Editor, "рџ“ќ", "Editor"),
+                        (Tab::Constructor, "рџЏ—", "Constructor"),
+                        (Tab::Admin, "рџ› ", "Admin"),
+                        (Tab::AdHoc, "рџ’»", "Ad-Hoc"),
+                        (Tab::Library, "рџ“љ", "Library"),
+                        (Tab::Roles, "рџ“¦", "Roles"),
+                        (Tab::DiffView, "рџ”Ќ", "Diff"),
+                        (Tab::Graph, "рџ•ё", "Graph"),
+                        (Tab::Terraform, "рџЊЌ", "Terraform"),
+                        (Tab::Tools, "рџ§°", "Tools"),
+                        (Tab::History, "рџ—‚", "History"),
+                        (Tab::Domain, "рџ–Ґ", "Domain"),
+                        (Tab::Profiles, "рџ§ѕ", "Profiles"),
+                        (Tab::Workflow, "рџ”Ђ", "Workflow"),
+                        (Tab::OpsCenter, "вљЎ", "OpsCenter"),
+                        (Tab::Compliance, "рџ›Ў", "Compliance"),
                     ];
                     for (t, icon, label) in nav {
                         let sel = self.tab == t;
@@ -919,9 +899,9 @@ impl eframe::App for AnsibleApp {
             .exact_height(26.0)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.colored_label(c_green(), "●");
+                    ui.colored_label(c_green(), "в—Џ");
                     ui.label(
-                        RichText::new(&self.ansible_version)
+                        RichText::new(&self.ui.ansible_version)
                             .color(c_tm())
                             .size(12.0),
                     );
@@ -938,7 +918,7 @@ impl eframe::App for AnsibleApp {
                             .size(12.0),
                     );
                     ui.separator();
-                    ui.label(RichText::new("Ctrl+P — палитра").color(c_tm()).size(12.0));
+                    ui.label(RichText::new("Ctrl+P вЂ” РїР°Р»РёС‚СЂР°").color(c_tm()).size(12.0));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.label(
                             RichText::new(format!("{} v{}", APP_NAME, APP_VERSION))
@@ -949,48 +929,48 @@ impl eframe::App for AnsibleApp {
                 });
             });
 
-        if self.show_about {
+        if self.ui.show_about {
             let mut close_clicked = false;
             egui::Window::new(
-                RichText::new(format!("ℹ️ О программе {}", APP_NAME)).color(c_blue()),
+                RichText::new(format!("в„№пёЏ Рћ РїСЂРѕРіСЂР°РјРјРµ {}", APP_NAME)).color(c_blue()),
             )
-            .open(&mut self.show_about)
+            .open(&mut self.ui.show_about)
             .default_size(Vec2::new(520.0, 480.0))
             .show(ctx, |ui| {
                 ui.label(RichText::new(APP_NAME).size(22.0).strong().color(c_tx()));
-                ui.label(RichText::new(format!("Версия {}", APP_VERSION)).color(c_tm()));
+                ui.label(RichText::new(format!("Р’РµСЂСЃРёСЏ {}", APP_VERSION)).color(c_tm()));
                 ui.add_space(8.0);
                 ui.separator();
                 ui.add_space(6.0);
-                ui.label(RichText::new("🦖 Написано на:").strong().color(c_purple()));
-                ui.label("• Rust, egui/eframe 0.29, tokio, serde, syntect, petgraph, rfd, ureq");
+                ui.label(RichText::new("рџ¦– РќР°РїРёСЃР°РЅРѕ РЅР°:").strong().color(c_purple()));
+                ui.label("вЂў Rust, egui/eframe 0.29, tokio, serde, syntect, petgraph, rfd, ureq");
                 ui.add_space(6.0);
-                ui.label(RichText::new("🔧 Бэкенд:").strong().color(c_purple()));
-                ui.label("• Ansible Core, Terraform, Git, createrepo, Zabbix sender");
+                ui.label(RichText::new("рџ”§ Р‘СЌРєРµРЅРґ:").strong().color(c_purple()));
+                ui.label("вЂў Ansible Core, Terraform, Git, createrepo, Zabbix sender");
                 ui.add_space(6.0);
-                ui.label(RichText::new("👤 Автор:").strong().color(c_purple()));
-                ui.label(format!("• Почта: {}", AUTHOR_EMAIL));
+                ui.label(RichText::new("рџ‘¤ РђРІС‚РѕСЂ:").strong().color(c_purple()));
+                ui.label(format!("вЂў РџРѕС‡С‚Р°: {}", AUTHOR_EMAIL));
                 ui.add_space(4.0);
-                ui.label(RichText::new("🔗 Проект:").strong().color(c_purple()));
+                ui.label(RichText::new("рџ”— РџСЂРѕРµРєС‚:").strong().color(c_purple()));
                 ui.hyperlink_to(APP_REPO, APP_REPO);
                 ui.add_space(4.0);
-                ui.label(RichText::new("📜 Лицензия: MIT").color(c_tm()));
+                ui.label(RichText::new("рџ“њ Р›РёС†РµРЅР·РёСЏ: MIT").color(c_tm()));
                 ui.add_space(10.0);
-                if ui.button("Закрыть").clicked() {
+                if ui.button("Р—Р°РєСЂС‹С‚СЊ").clicked() {
                     close_clicked = true;
                 }
             });
             if close_clicked {
-                self.show_about = false;
+                self.ui.show_about = false;
             }
         }
 
-        if self.show_palette {
+        if self.ui.show_palette {
             let mut action: Option<String> = None;
-            let mut open = self.show_palette;
-            let mut query = self.palette_query.clone();
+            let mut open = self.ui.show_palette;
+            let mut query = self.ui.palette_query.clone();
             let cmds = self.commands();
-            egui::Window::new("⌘ Command Palette")
+            egui::Window::new("вЊ Command Palette")
                 .anchor(egui::Align2::CENTER_TOP, [0.0, 90.0])
                 .default_size([440.0, 320.0])
                 .open(&mut open)
@@ -1009,11 +989,11 @@ impl eframe::App for AnsibleApp {
                         }
                     });
                 });
-            self.palette_query = query;
-            self.show_palette = open;
+            self.ui.palette_query = query;
+            self.ui.show_palette = open;
             if let Some(id) = action {
                 self.run_command(&id);
-                self.show_palette = false;
+                self.ui.show_palette = false;
             }
         }
 
@@ -1040,7 +1020,7 @@ impl eframe::App for AnsibleApp {
         egui::Area::new(egui::Id::new("toasts"))
             .fixed_pos(egui::pos2(60.0, 90.0))
             .show(ctx, |ui| {
-                for (msg, t) in &self.toasts {
+                for (msg, t) in &self.ui.toasts {
                     let alpha = 1.0 - (t.elapsed().as_secs_f32() / 4.0);
                     Frame::none()
                         .fill(c_blue().gamma_multiply(0.25 * alpha))
@@ -1054,3 +1034,4 @@ impl eframe::App for AnsibleApp {
             });
     }
 }
+

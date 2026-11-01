@@ -348,6 +348,65 @@ pub struct RolesState {
     pub target_hosts: String,
 }
 
+/// Конфигурация встроенного Web API.
+#[derive(Debug, Clone, Default)]
+pub struct WebConfig {
+    pub enabled: bool,
+    pub bind: String,
+    pub token: String,
+    pub api_port: String,
+}
+
+/// Конфигурация Zabbix sender.
+#[derive(Debug, Clone, Default)]
+pub struct ZabbixConfig {
+    pub server: String,
+    pub port: String,
+    pub output: String,
+}
+
+/// Конфигурация RPM-репозитория и Git-операций.
+#[derive(Debug, Clone, Default)]
+pub struct RpmGitConfig {
+    pub rpm_dir: String,
+    pub rpm_out: String,
+    pub git_dir: String,
+    pub git_out: String,
+    pub git_msg: String,
+}
+
+/// Состояние пользовательского интерфейса (тема, язык, уведомления).
+#[derive(Debug, Clone, Default)]
+pub struct UiState {
+    pub show_about: bool,
+    pub theme_idx: usize,
+    pub lang: Lang,
+    pub show_palette: bool,
+    pub palette_query: String,
+    pub theme_dirty: bool,
+    pub auto_scroll: bool,
+    pub error_message: Option<String>,
+    pub ansible_version: String,
+    pub toasts: Vec<(String, Instant)>,
+}
+
+/// Состояние планировщика и compliance-проверок.
+#[derive(Debug, Clone, Default)]
+pub struct SchedulerComplianceState {
+    pub sched_tasks: Vec<SchedTask>,
+    pub comp_rx: Option<std::sync::mpsc::Receiver<ComplianceResult>>,
+    pub rule_rx: Option<std::sync::mpsc::Receiver<String>>,
+    pub last_rule_check: Instant,
+}
+
+/// Состояние diff-версий и runs.
+#[derive(Debug, Clone, Default)]
+pub struct DiffVersionsState {
+    pub diff: DiffState,
+    pub diff_rx: Option<std::sync::mpsc::Receiver<String>>,
+    pub versions: Option<crate::ansible::diff::VersionStore>,
+}
+
 pub struct ModuleCatalog;
 impl ModuleCatalog {
     pub fn categories() -> Vec<(&'static str, Vec<&'static str>)> {

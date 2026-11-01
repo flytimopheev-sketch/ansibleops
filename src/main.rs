@@ -4,6 +4,7 @@ mod models;
 mod theme;
 mod ui_ops;
 mod ui_tabs;
+mod validation;
 
 use app::AnsibleApp;
 
