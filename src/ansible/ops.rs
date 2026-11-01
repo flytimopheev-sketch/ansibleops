@@ -1,5 +1,20 @@
 use crate::models::{CompCheck, WfStep};
 
+/// Белый список безопасных символов для аргументов shell-команд.
+/// Запрещает `; & | ` $ ( ) { } < > \n \r и другие управляющие символы.
+fn sanitize_shell_arg(input: &str) -> String {
+    input
+        .chars()
+        .filter(|c| {
+            c.is_ascii_alphanumeric()
+                || matches!(
+                    c,
+                    '-' | '_' | '.' | '/' | ' ' | ':' | '@' | ',' | '='
+                )
+        })
+        .collect()
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Safety {
     Safe,
@@ -334,7 +349,8 @@ pub fn check_rule(kind: &str, param: &str, hosts: &str) -> Option<String> {
             }
         }
         "service" => {
-            let v = run(&format!("systemctl is-active {}", param)).unwrap_or_default();
+            let safe_param = sanitize_shell_arg(param);
+            let v = run(&format!("systemctl is-active {}", safe_param)).unwrap_or_default();
             if !v.contains("active") {
                 Some(format!("Служба '{}' не активна", param))
             } else {

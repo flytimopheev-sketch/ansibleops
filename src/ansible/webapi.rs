@@ -2,23 +2,27 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Генерирует криптографически стойкий bearer-токен (24 случайных байта, hex-кодировка).
 pub fn generate_token() -> String {
-    use std::hash::{Hash, Hasher};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0)
-        .hash(&mut h);
-    std::process::id().hash(&mut h);
-    format!(
-        "{:016x}{:016x}",
-        h.finish(),
-        std::time::SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.subsec_nanos() as u64)
-            .unwrap_or(0)
-    )
+    use rand::RngCore;
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut rng = rand::thread_rng();
+    let mut buf = [0u8; 24];
+    rng.fill_bytes(&mut buf);
+    let mut hex = Vec::with_capacity(48);
+    for &b in &buf {
+        hex.push(HEX_CHARS[(b >> 4) as usize]);
+        hex.push(HEX_CHARS[(b & 0x0F) as usize]);
+    }
+    String::from_utf8(hex).expect("hex is valid utf-8")
+}
+
+/// Извлекает bearer-токен из заголовка `Authorization: Bearer <token>` HTTP-запроса.
+fn extract_bearer_token(req: &str) -> Option<&str> {
+    req.lines()
+        .find(|line| line.to_ascii_lowercase().starts_with("authorization:"))
+        .and_then(|line| line.split_once(':'))
+        .and_then(|(_, value)| value.trim().strip_prefix("Bearer "))
 }
 
 /// Безопасный мини-веб-сервер: только GET, bearer-токен, лог запросов.
@@ -66,10 +70,7 @@ pub fn start(port: u16, bind_addr: &str, token: &str, history_dir: String) -> Re
                 )
             };
             let authorized = !token.is_empty()
-                && req.to_ascii_lowercase().contains(&format!(
-                    "authorization: bearer {}",
-                    token.to_ascii_lowercase()
-                ));
+                && extract_bearer_token(&req) == Some(token);
             let (status, body, ctype) = match (method.as_str(), authorized) {
                 ("GET", true) if path.starts_with("/api/history") => {
                     let mut items = Vec::new();

@@ -172,6 +172,7 @@ dependencies = [
  "eframe",
  "egui",
  "petgraph",
+ "rand",
  "rfd",
  "serde",
  "serde_json",
