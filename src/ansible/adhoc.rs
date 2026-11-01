@@ -56,11 +56,14 @@ impl AdHocRunner {
                 return Ok(());
             }
         };
-        let stdout = child.stdout.take().unwrap();
+        let stdout = child.stdout.take().ok_or_else(|| {
+            anyhow::anyhow!("не удалось получить stdout от процесса ansible")
+        })?;
         let mut reader = BufReader::new(stdout).lines();
         let mut output_lines = initial_job.output.clone();
         let mut base_job = initial_job;
-        while let Ok(Some(line)) = reader.next_line().await {
+        let read_timeout = std::time::Duration::from_secs(300);
+        while let Ok(Some(line)) = tokio::time::timeout(read_timeout, reader.next_line()).await {
             output_lines.push(line.clone());
             let mut u = base_job.clone();
             u.output = output_lines.clone();

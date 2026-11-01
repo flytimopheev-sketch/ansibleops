@@ -29,8 +29,12 @@ impl TerraformRunner {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let mut child = cmd.spawn()?;
-        let out = child.stdout.take().unwrap();
-        let err = child.stderr.take().unwrap();
+        let out = child.stdout.take().ok_or_else(|| {
+            anyhow::anyhow!("не удалось получить stdout от процесса terraform")
+        })?;
+        let err = child.stderr.take().ok_or_else(|| {
+            anyhow::anyhow!("не удалось получить stderr от процесса terraform")
+        })?;
         let tx2 = tx.clone();
         let h1 = tokio::spawn(async move {
             let mut r = BufReader::new(out).lines();
@@ -54,7 +58,11 @@ impl TerraformRunner {
                     .await;
             }
         });
-        let _ = tokio::join!(h1, h2);
+        let read_timeout = std::time::Duration::from_secs(300);
+        let _ = tokio::join!(
+            tokio::time::timeout(read_timeout, h1),
+            tokio::time::timeout(read_timeout, h2),
+        );
         Ok(child.wait().await?.success())
     }
 }

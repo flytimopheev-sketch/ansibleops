@@ -4,6 +4,18 @@
 
 Формат следует принципам [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/), и проект придерживается [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Добавлено
+- Юнит-тесты для `webapi.rs` (generate_token, extract_bearer_token)
+- Юнит-тесты для `ops.rs` (sanitize_shell_arg, check_rule с защитой от инъекций)
+- Бейдж Dependabot в README.md
+
+### Исправлено
+- `runner.rs`: `expect("stdout piped above")` заменён на корректную обработку ошибки; добавлен таймаут 300 сек на чтение строки вывода
+- `terraform.rs`: `unwrap()` на stdout/stderr заменён на корректную обработку ошибки; добавлен таймаут 300 сек на чтение потоков
+- `adhoc.rs`: `unwrap()` на stdout заменён на корректную обработку ошибки; добавлен таймаут 300 сек на чтение строки вывода
+
 ## [1.2.0] — 2026-10-21
 
 ### Добавлено

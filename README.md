@@ -6,6 +6,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![egui](https://img.shields.io/badge/egui-0.29-purple.svg)](https://github.com/emilk/egui)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Dependabot](https://badgen.net/github/dependabot/flytimopheev-sketch/ansibleops?icon=dependabot)](https://github.com/flytimopheev-sketch/ansibleops/network/updates)
 
 **AnsibleOps** — десктопный центр управления Ansible и Terraform: запуск playbook,
 ad-hoc команды, визуальный конструктор, граф задач, инвентарь, роли, GitOps,

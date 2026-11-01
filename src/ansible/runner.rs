@@ -86,11 +86,14 @@ impl AnsibleRunner {
             }
         };
 
-        let stdout = child.stdout.take().expect("stdout piped above");
+        let stdout = child.stdout.take().ok_or_else(|| {
+            anyhow::anyhow!("не удалось получить stdout от процесса {cmd_name}")
+        })?;
         let mut reader = BufReader::new(stdout).lines();
         let mut success = true;
         let mut cancelled = false;
-        while let Ok(Some(line)) = reader.next_line().await {
+        let read_timeout = std::time::Duration::from_secs(300);
+        while let Ok(Some(line)) = tokio::time::timeout(read_timeout, reader.next_line()).await {
             if cancel.load(Ordering::Relaxed) {
                 cancelled = true;
                 break;

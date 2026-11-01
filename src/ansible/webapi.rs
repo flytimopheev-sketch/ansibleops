@@ -120,3 +120,52 @@ pub fn start(port: u16, bind_addr: &str, token: &str, history_dir: String) -> Re
     });
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_token_is_hex_and_length() {
+        let token = generate_token();
+        assert_eq!(token.len(), 48);
+        assert!(token.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_generate_token_is_unique() {
+        let t1 = generate_token();
+        let t2 = generate_token();
+        assert_ne!(t1, t2);
+    }
+
+    #[test]
+    fn test_extract_bearer_token() {
+        let req = "GET /api/history HTTP/1.1\r\nAuthorization: Bearer abc123\r\nHost: localhost\r\n";
+        assert_eq!(extract_bearer_token(req), Some("abc123"));
+    }
+
+    #[test]
+    fn test_extract_bearer_token_case_insensitive() {
+        let req = "GET /api/history HTTP/1.1\r\nauthorization: bearer ABC123\r\nHost: localhost\r\n";
+        assert_eq!(extract_bearer_token(req), Some("ABC123"));
+    }
+
+    #[test]
+    fn test_extract_bearer_token_missing() {
+        let req = "GET /api/history HTTP/1.1\r\nHost: localhost\r\n";
+        assert_eq!(extract_bearer_token(req), None);
+    }
+
+    #[test]
+    fn test_extract_bearer_token_wrong_scheme() {
+        let req = "GET /api/history HTTP/1.1\r\nAuthorization: Basic abc123\r\nHost: localhost\r\n";
+        assert_eq!(extract_bearer_token(req), None);
+    }
+
+    #[test]
+    fn test_extract_bearer_token_empty_value() {
+        let req = "GET /api/history HTTP/1.1\r\nAuthorization: Bearer \r\nHost: localhost\r\n";
+        assert_eq!(extract_bearer_token(req), Some(""));
+    }
+}

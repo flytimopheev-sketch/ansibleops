@@ -368,3 +368,55 @@ pub fn check_rule(kind: &str, param: &str, hosts: &str) -> Option<String> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_shell_arg_removes_dangerous_chars() {
+        let input = "sshd; rm -rf /";
+        let output = sanitize_shell_arg(input);
+        assert!(!output.contains(';'));
+        assert!(!output.contains('&'));
+        assert!(!output.contains('|'));
+        assert!(!output.contains('$'));
+        assert!(!output.contains('('));
+        assert!(!output.contains(')'));
+        assert!(!output.contains('{'));
+        assert!(!output.contains('}'));
+        assert!(!output.contains('<'));
+        assert!(!output.contains('>'));
+        assert!(!output.contains('\n'));
+        assert!(!output.contains('\r'));
+        assert!(!output.contains('`'));
+    }
+
+    #[test]
+    fn test_sanitize_shell_arg_keeps_safe_chars() {
+        let input = "sshd.service";
+        let output = sanitize_shell_arg(input);
+        assert_eq!(output, "sshd.service");
+    }
+
+    #[test]
+    fn test_sanitize_shell_arg_keeps_spaces_and_slashes() {
+        let input = "/usr/bin/systemctl restart sshd";
+        let output = sanitize_shell_arg(input);
+        assert_eq!(output, "/usr/bin/systemctl restart sshd");
+    }
+
+    #[test]
+    fn test_sanitize_shell_arg_empty() {
+        assert_eq!(sanitize_shell_arg(""), "");
+    }
+
+    #[test]
+    fn test_check_rule_service_with_injection() {
+        // Попытка инъекции через param должна быть санитизирована
+        let result = check_rule("service", "sshd; reboot", "all");
+        // servicio с санитизированным именем не будет найден как active, но не выполнит reboot
+        assert!(result.is_some());
+        assert!(!result.unwrap().contains("reboot"));
+    }
+}
